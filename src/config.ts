@@ -6,7 +6,7 @@ import { NAME_PATTERN } from "./naming";
 export interface UserEntry {
   name: string;
   github_team: string;
-  aws_account: string;
+  iam_group: string;
 }
 
 export interface UsersConfig {
@@ -77,9 +77,9 @@ export function validateConfig(config: UsersConfig) {
         `User at index ${i} is missing required field "github_team"`,
       );
     }
-    if (!user.aws_account || typeof user.aws_account !== "string") {
+    if (!user.iam_group || typeof user.iam_group !== "string") {
       throw new Error(
-        `User at index ${i} is missing required field "aws_account"`,
+        `User at index ${i} is missing required field "iam_group"`,
       );
     }
 
