@@ -1,6 +1,8 @@
 import { load as yamlLoad } from "js-yaml";
 import { readFileSync } from "fs";
 
+import { NAME_PATTERN } from "./naming";
+
 export interface UserEntry {
   name: string;
   github_team: string;
@@ -10,8 +12,6 @@ export interface UserEntry {
 export interface UsersConfig {
   users: UserEntry[];
 }
-
-const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Load and parse a YAML configuration file into a UsersConfig object.
