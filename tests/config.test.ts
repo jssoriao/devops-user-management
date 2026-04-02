@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import * as fc from "fast-check";
 import * as yaml from "js-yaml";
-import * as fs from "fs";
+import * as fc from "fast-check";
 import * as path from "path";
+import * as fs from "fs";
 import * as os from "os";
+
 import { loadConfig, UsersConfig, UserEntry } from "../src/config";
 
 // Feature: devops-user-management, Property 1: Config loading round-trip

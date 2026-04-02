@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
+
 import { validateConfig, UsersConfig } from "../src/config";
 
 // Feature: devops-user-management, Property 4: Config validation rejects invalid input
