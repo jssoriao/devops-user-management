@@ -1,5 +1,5 @@
-import * as yaml from "js-yaml";
-import * as fs from "fs";
+import { load as yamlLoad } from "js-yaml";
+import { readFileSync } from "fs";
 
 export interface UserEntry {
   name: string;
@@ -20,7 +20,7 @@ const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export function loadConfig(filePath: string): UsersConfig {
   let content: string;
   try {
-    content = fs.readFileSync(filePath, "utf-8");
+    content = readFileSync(filePath, "utf-8");
   } catch (err: any) {
     if (err.code === "ENOENT") {
       throw new Error(`Configuration file not found: ${filePath}`);
@@ -32,7 +32,7 @@ export function loadConfig(filePath: string): UsersConfig {
 
   let parsed: unknown;
   try {
-    parsed = yaml.load(content);
+    parsed = yamlLoad(content);
   } catch (err: any) {
     throw new Error(
       `Invalid YAML in configuration file: ${filePath} - ${err.message}`,

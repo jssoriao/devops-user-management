@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import * as yaml from "js-yaml";
+import { dump as yamlDump } from "js-yaml";
 import * as fc from "fast-check";
 import * as path from "path";
 import * as fs from "fs";
@@ -49,11 +49,14 @@ describe("Property 1: Config loading round-trip", () => {
     fc.assert(
       fc.property(validUsersConfig, (config) => {
         // Serialize to YAML
-        const yamlStr = yaml.dump(config);
+        const yamlStr = yamlDump(config);
 
         // Write to a temp file
         const tmpDir = os.tmpdir();
-        const tmpFile = path.join(tmpDir, `test-config-${Date.now()}-${Math.random().toString(36).slice(2)}.yaml`);
+        const tmpFile = path.join(
+          tmpDir,
+          `test-config-${Date.now()}-${Math.random().toString(36).slice(2)}.yaml`,
+        );
         fs.writeFileSync(tmpFile, yamlStr, "utf-8");
 
         try {
@@ -64,8 +67,12 @@ describe("Property 1: Config loading round-trip", () => {
           expect(loaded.users.length).toBe(config.users.length);
           for (let i = 0; i < config.users.length; i++) {
             expect(loaded.users[i].name).toBe(config.users[i].name);
-            expect(loaded.users[i].github_team).toBe(config.users[i].github_team);
-            expect(loaded.users[i].aws_account).toBe(config.users[i].aws_account);
+            expect(loaded.users[i].github_team).toBe(
+              config.users[i].github_team,
+            );
+            expect(loaded.users[i].aws_account).toBe(
+              config.users[i].aws_account,
+            );
           }
         } finally {
           // Cleanup
