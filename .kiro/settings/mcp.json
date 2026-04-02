@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "pulumi": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://mcp.ai.pulumi.com/mcp"],
+      "disabled": false
+    }
+  }
+}
