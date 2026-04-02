@@ -4,7 +4,7 @@
   "description": "Pulumi project for managing GitHub teams/memberships and AWS IAM users from YAML config",
   "main": "index.ts",
   "scripts": {
-    "test": "vitest --run",
+    "test": "vitest --run --reporter verbose",
     "test:watch": "vitest"
   },
   "dependencies": {
