@@ -50,7 +50,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 
 - [x] 5. Create CI workflow for tests
   - [x] 5.1 Create `.github/workflows/ci.yml` GitHub Actions workflow
-    - Run `pnpm install --frozen-lockfile` and `pnpm vitest --run` on every push to any branch and on every PR
+    - Run `pnpm install --frozen-lockfile` and `pnpm test` on every push to any branch and on every PR
     - _Requirements: 10.1_
 
 - [ ] 6. Implement GitHub Team Component Resource
