@@ -1,0 +1,3 @@
+name: devops-user-management
+runtime: nodejs
+description: Manages GitHub organization membership and AWS IAM users from a single YAML configuration file

@@ -6,8 +6,8 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 
 ## Tasks
 
-- [-] 1. Initialize project structure and dependencies
-  - Create `Pulumi.yaml` with project name `pulumi-user-management` and runtime `nodejs`
+- [x] 1. Initialize project structure and dependencies
+  - Create `Pulumi.yaml` with project name `devops-user-management` and runtime `nodejs`
   - Create `package.json` with dependencies: `@pulumi/pulumi`, `@pulumi/github`, `@pulumi/aws`, `js-yaml`, and devDependencies: `typescript`, `vitest`, `fast-check`, `@types/js-yaml`
   - Create `tsconfig.json` with strict mode, ES2020 target, and module resolution
   - Create empty `src/` and `tests/` directories with placeholder files

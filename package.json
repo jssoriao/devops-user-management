@@ -1,0 +1,22 @@
+{
+  "name": "devops-user-management",
+  "version": "1.0.0",
+  "description": "Pulumi project for managing GitHub teams/memberships and AWS IAM users from YAML config",
+  "main": "index.ts",
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/github": "^6.0.0",
+    "@pulumi/aws": "^6.0.0",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "fast-check": "^3.0.0",
+    "@types/js-yaml": "^4.0.0"
+  }
+}

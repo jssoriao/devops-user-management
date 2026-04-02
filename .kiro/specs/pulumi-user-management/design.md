@@ -244,7 +244,7 @@ Each stack file (`Pulumi.{env}.yaml`) contains:
 
 ```yaml
 config:
-  pulumi-user-management:usersFile: users.yaml        # path to config
+  devops-user-management:usersFile: users.yaml        # path to config
   github:token:
     secure: <encrypted-token>                          # Pulumi secret
   aws:region: us-east-1
@@ -359,7 +359,7 @@ Both are complementary. Unit tests catch concrete bugs with known inputs. Proper
 - **Minimum iterations**: 100 per property test
 - **Each test references its design property** with a tag comment:
   ```
-  // Feature: pulumi-user-management, Property 1: Config loading round-trip
+  // Feature: devops-user-management, Property 1: Config loading round-trip
   ```
 
 ### Unit Test Plan
