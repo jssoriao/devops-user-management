@@ -38,9 +38,8 @@ beforeAll(() => {
 
 describe("GitHubMembershipComponent", () => {
   it("defaults membership role to 'member' when no role is specified (property)", async () => {
-    const { GitHubMembershipComponent } = await import(
-      "../src/components/github-membership"
-    );
+    const { GitHubMembershipComponent } =
+      await import("../src/components/github-membership");
 
     await fc.assert(
       fc.asyncProperty(validName, validName, async (username, teamSlug) => {
@@ -53,9 +52,9 @@ describe("GitHubMembershipComponent", () => {
 
         // Await outputs to ensure child resources are registered
         await new Promise<void>((resolve) =>
-          pulumi.all([comp.membership.urn, comp.teamMembership.urn]).apply(
-            () => resolve(),
-          ),
+          pulumi
+            .all([comp.membership.urn, comp.teamMembership.urn])
+            .apply(() => resolve()),
         );
 
         const newResources = createdResources.slice(startIdx);
@@ -78,9 +77,8 @@ describe("GitHubMembershipComponent", () => {
   });
 
   it("uses the provided role when explicitly specified", async () => {
-    const { GitHubMembershipComponent } = await import(
-      "../src/components/github-membership"
-    );
+    const { GitHubMembershipComponent } =
+      await import("../src/components/github-membership");
 
     const startIdx = createdResources.length;
 
@@ -91,9 +89,9 @@ describe("GitHubMembershipComponent", () => {
     });
 
     await new Promise<void>((resolve) =>
-      pulumi.all([comp.membership.urn, comp.teamMembership.urn]).apply(() =>
-        resolve(),
-      ),
+      pulumi
+        .all([comp.membership.urn, comp.teamMembership.urn])
+        .apply(() => resolve()),
     );
 
     const newResources = createdResources.slice(startIdx);
