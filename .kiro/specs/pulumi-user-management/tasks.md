@@ -16,12 +16,12 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 - [x] 2. Implement configuration loading and validation
   - [x] 2.1 Create `src/config.ts` with `UserEntry` and `UsersConfig` interfaces
     - Implement `loadConfig(filePath: string): UsersConfig` using `js-yaml` to parse the YAML file synchronously
-    - Implement `validateConfig(config: UsersConfig): void` that checks: each user has `name`, `github_team`, `aws_account`; each `name` matches `/^[a-z0-9]+(-[a-z0-9]+)*$/`; no duplicate names
+    - Implement `validateConfig(config: UsersConfig): void` that checks: each user has `name`, `github_team`, `iam_group`; each `name` matches `/^[a-z0-9]+(-[a-z0-9]+)*$/`; no duplicate names
     - Throw descriptive errors for missing file, invalid YAML, missing fields, invalid characters, and duplicate names
     - _Requirements: 1.1, 1.4, 1.5, 6.3_
 
   - [x] 2.2 Create sample `users.yaml` configuration file
-    - Include at least two users with different `github_team` and `aws_account` values (e.g., alice/backend/dev, bob/frontend/prod)
+    - Include at least two users with different `github_team` and `iam_group` values (e.g., alice/backend/dev, bob/frontend/prod)
     - _Requirements: 1.4_
 
   - [x] * 2.3 Write property test for config round-trip (Property 1)
@@ -53,8 +53,8 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Run `pnpm install --frozen-lockfile` and `pnpm test` on every push to any branch and on every PR
     - _Requirements: 10.1_
 
-- [ ] 6. Implement GitHub Team Component Resource
-  - [ ] 6.1 Create `src/components/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
+- [x] 6. Implement GitHub Team Component Resource
+  - [x] 6.1 Create `src/components/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubTeamComponentArgs` with `teamSlug` and optional `description`
     - Create a `github.Team` resource with name derived via `resourceName`
     - Register outputs on the component
@@ -83,7 +83,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Load and validate config using `loadConfig` and `validateConfig`
     - Get stack name via `pulumi.getStack()`
     - Derive unique teams from `github_team` values and create `GitHubTeamComponent` for each
-    - Derive unique groups from `aws_account` values and create `aws.iam.Group` + `aws.iam.GroupPolicyAttachment` (default `ReadOnlyAccess`) for each
+    - Derive unique groups from `iam_group` values and create `aws.iam.Group` + `aws.iam.GroupPolicyAttachment` (default `ReadOnlyAccess`) for each
     - Support custom policy ARN from stack config per group
     - Iterate users and create `GitHubMembershipComponent` and `AWSUserComponent` for each, with correct `dependsOn`
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.3, 3.1, 3.2, 4.1, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4, 6.1, 7.2_

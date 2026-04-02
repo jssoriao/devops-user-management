@@ -15,7 +15,7 @@ The project uses Pulumi Component Resources for encapsulation, supports multi-en
 2. **Component Resources over raw resources** — Each logical grouping (GitHub team, GitHub membership, AWS user) is a Pulumi `ComponentResource`, enabling reuse and clean resource tree organization.
 3. **Validation before resource creation** — The config is parsed and validated (schema + naming convention) before any Pulumi resources are registered. This gives fast, clear errors.
 4. **Stack-name prefixing for namespace isolation** — Every resource name is prefixed with the Pulumi stack name, so dev/staging/prod never collide.
-5. **IAM groups created on-demand** — Groups are derived from the set of unique `aws_account` values in config. If no user references a group, it is not created.
+5. **IAM groups created on-demand** — Groups are derived from the set of unique `iam_group` values in config. If no user references a group, it is not created.
 
 ## Architecture
 
@@ -104,7 +104,7 @@ Responsible for reading and validating `users.yaml`.
 interface UserEntry {
   name: string;
   github_team: string;
-  aws_account: string;
+  iam_group: string;
 }
 
 interface UsersConfig {
@@ -117,7 +117,7 @@ function validateConfig(config: UsersConfig): void; // throws on invalid
 
 - `loadConfig` reads the YAML file synchronously (Pulumi programs run synchronously at preview time).
 - `validateConfig` checks:
-  - Each user has `name`, `github_team`, `aws_account`.
+  - Each user has `name`, `github_team`, `iam_group`.
   - Each `name` matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` (lowercase alphanumeric with hyphens).
   - No duplicate user names.
 
@@ -179,7 +179,7 @@ class AWSUserComponent extends pulumi.ComponentResource {
 }
 ```
 
-Creates an `aws.iam.User` and a `aws.iam.UserGroupMembership`. The IAM group and its policy attachment are created separately in `index.ts` (one per unique `aws_account` value) to avoid duplication.
+Creates an `aws.iam.User` and a `aws.iam.UserGroupMembership`. The IAM group and its policy attachment are created separately in `index.ts` (one per unique `iam_group` value) to avoid duplication.
 
 ### Entry Point (`index.ts`)
 
@@ -192,7 +192,7 @@ const stackName = pulumi.getStack();
 
 // 1. Derive unique teams and groups
 const uniqueTeams = [...new Set(config.users.map(u => u.github_team))];
-const uniqueGroups = [...new Set(config.users.map(u => u.aws_account))];
+const uniqueGroups = [...new Set(config.users.map(u => u.iam_group))];
 
 // 2. Create GitHub teams
 const teams: Record<string, GitHubTeamComponent> = {};
@@ -220,8 +220,8 @@ for (const user of config.users) {
 
   new AWSUserComponent(resourceName(stackName, user.name, "aws"), {
     username: resourceName(stackName, user.name),
-    groupName: resourceName(stackName, user.aws_account),
-  }, { dependsOn: [groups[user.aws_account]] });
+    groupName: resourceName(stackName, user.iam_group),
+  }, { dependsOn: [groups[user.iam_group]] });
 }
 ```
 
@@ -233,16 +233,16 @@ for (const user of config.users) {
 users:
   - name: alice
     github_team: backend
-    aws_account: dev
+    iam_group: developers
   - name: bob
     github_team: frontend
-    aws_account: prod
+    iam_group: admins
 ```
 
 **Constraints:**
 - `name`: required, must match `/^[a-z0-9]+(-[a-z0-9]+)*$/`
 - `github_team`: required, must match same pattern
-- `aws_account`: required, must match same pattern
+- `iam_group`: required, must match same pattern
 - No duplicate `name` values
 
 ### Pulumi Stack Configuration
@@ -263,11 +263,11 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 
 | Resource Type | Name Pattern | Example (stack=dev) |
 |---|---|---|
-| GitHub Team | `{stack}-{teamSlug}` | `dev-backend` |
-| GitHub Membership | `{stack}-{username}-github` | `dev-alice-github` |
+| GitHub Team | `{teamSlug}` | `backend` |
+| GitHub Membership | `{username}-github` | `alice-github` |
 | IAM User | `{stack}-{username}` | `dev-alice` |
-| IAM Group | `{stack}-{aws_account}` | `dev-dev-account` |
-| IAM Group Policy | `{stack}-{aws_account}-policy` | `dev-dev-account-policy` |
+| IAM Group | `{stack}-{iam_group}` | `dev-developers` |
+| IAM Group Policy | `{stack}-{iam_group}-policy` | `dev-developers-policy` |
 
 
 ## Correctness Properties
@@ -282,7 +282,7 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 
 ### Property 2: Resource count matches configuration
 
-*For any* valid `UsersConfig` with N user entries, M unique `github_team` values, and K unique `aws_account` values, the Pulumi program should register exactly N GitHub membership components, N AWS user components, M GitHub team components, and K IAM groups.
+*For any* valid `UsersConfig` with N user entries, M unique `github_team` values, and K unique `iam_group` values, the Pulumi program should register exactly N GitHub membership components, N AWS user components, M GitHub team components, and K IAM groups.
 
 **Validates: Requirements 1.2, 2.1, 3.1, 4.1, 4.4**
 
@@ -294,7 +294,7 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 
 ### Property 4: Config validation rejects invalid input
 
-*For any* user entry that is missing a required field (`name`, `github_team`, or `aws_account`) or whose `name` contains characters outside `/^[a-z0-9-]+$/`, `validateConfig` should throw a validation error.
+*For any* user entry that is missing a required field (`name`, `github_team`, or `iam_group`) or whose `name` contains characters outside `/^[a-z0-9-]+$/`, `validateConfig` should throw a validation error.
 
 **Validates: Requirements 1.4, 1.5, 6.3**
 
@@ -312,7 +312,7 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 
 ### Property 7: IAM user assigned to correct group
 
-*For any* valid user entry with an `aws_account` value, the created `UserGroupMembership` resource should reference the IAM group corresponding to that `aws_account` value.
+*For any* valid user entry with an `iam_group` value, the created `UserGroupMembership` resource should reference the IAM group corresponding to that `iam_group` value.
 
 **Validates: Requirements 4.3**
 
@@ -330,7 +330,7 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 |---|---|---|
 | `users.yaml` file not found | Throw `Error` with message indicating file path | Before resource creation |
 | Invalid YAML syntax | Throw `Error` with YAML parse error details | Before resource creation |
-| Missing required field (`name`, `github_team`, `aws_account`) | Throw `Error` listing the missing field and user index | Before resource creation |
+| Missing required field (`name`, `github_team`, `iam_group`) | Throw `Error` listing the missing field and user index | Before resource creation |
 | Invalid characters in `name` | Throw `Error` with the offending name and allowed pattern | Before resource creation |
 | Duplicate user `name` | Throw `Error` listing the duplicate name | Before resource creation |
 

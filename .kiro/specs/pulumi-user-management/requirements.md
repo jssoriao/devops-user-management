@@ -28,7 +28,7 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 1. THE Pulumi_Project SHALL read user definitions from a single User_Config YAML file at deployment time
 2. WHEN the User_Config file contains a user entry, THE Pulumi_Project SHALL create both a GitHub membership and an AWS IAM user for that entry
 3. WHEN a user entry is removed from the User_Config file, THE Pulumi_Project SHALL remove the corresponding GitHub membership and AWS IAM user on the next deployment
-4. THE User_Config SHALL define each user with a name, a github_team assignment, and an aws_account assignment
+4. THE User_Config SHALL define each user with a name, a github_team assignment, and an iam_group assignment
 5. IF the User_Config file is missing or contains invalid YAML, THEN THE Pulumi_Project SHALL fail with a descriptive error message before creating any resources
 
 ### Requirement 2: GitHub Team Management
@@ -62,7 +62,7 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 
 1. WHEN a user entry exists in the User_Config, THE AWS_User_Component SHALL create an AWS IAM user
 2. THE AWS_User_Component SHALL name the IAM user using the Naming_Convention
-3. WHEN a user entry specifies an aws_account, THE AWS_User_Component SHALL add the IAM user to the corresponding IAM_Group
+3. WHEN a user entry specifies an iam_group, THE AWS_User_Component SHALL add the IAM user to the corresponding IAM_Group
 4. THE AWS_User_Component SHALL create the IAM_Group if the group does not already exist
 5. THE AWS_User_Component SHALL be implemented as a Pulumi Component Resource
 
