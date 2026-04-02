@@ -1,7 +1,7 @@
 users:
   - name: alice
     github_team: backend
-    aws_account: dev
+    iam_group: backend-developers
   - name: bob
     github_team: frontend
-    aws_account: prod
+    iam_group: frontend-developers

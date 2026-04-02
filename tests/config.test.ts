@@ -18,7 +18,7 @@ import { validName } from "./arbitraries";
 const validUserEntry: fc.Arbitrary<UserEntry> = fc.record({
   name: validName,
   github_team: validName,
-  aws_account: validName,
+  iam_group: validName,
 });
 
 /** UsersConfig with unique user names */
@@ -75,8 +75,8 @@ describe("loadConfig", () => {
             expect(loaded.users[i].github_team).toBe(
               config.users[i].github_team,
             );
-            expect(loaded.users[i].aws_account).toBe(
-              config.users[i].aws_account,
+            expect(loaded.users[i].iam_group).toBe(
+              config.users[i].iam_group,
             );
           }
         } finally {
@@ -150,13 +150,13 @@ describe("validateConfig", () => {
 
   it("rejects random entries with missing name (property)", () => {
     fc.assert(
-      fc.property(validName, validName, (githubTeam, awsAccount) => {
+      fc.property(validName, validName, (githubTeam, iamGroup) => {
         const config: UsersConfig = {
           users: [
             {
               name: undefined as any,
               github_team: githubTeam,
-              aws_account: awsAccount,
+              iam_group: iamGroup,
             },
           ],
         };
@@ -168,10 +168,10 @@ describe("validateConfig", () => {
 
   it("rejects random entries with missing github_team (property)", () => {
     fc.assert(
-      fc.property(validName, validName, (name, awsAccount) => {
+      fc.property(validName, validName, (name, iamGroup) => {
         const config: UsersConfig = {
           users: [
-            { name, github_team: undefined as any, aws_account: awsAccount },
+            { name, github_team: undefined as any, iam_group: iamGroup },
           ],
         };
         expect(() => validateConfig(config)).toThrow();
@@ -180,12 +180,12 @@ describe("validateConfig", () => {
     );
   });
 
-  it("rejects random entries with missing aws_account (property)", () => {
+  it("rejects random entries with missing iam_group (property)", () => {
     fc.assert(
       fc.property(validName, validName, (name, githubTeam) => {
         const config: UsersConfig = {
           users: [
-            { name, github_team: githubTeam, aws_account: undefined as any },
+            { name, github_team: githubTeam, iam_group: undefined as any },
           ],
         };
         expect(() => validateConfig(config)).toThrow();
@@ -200,9 +200,9 @@ describe("validateConfig", () => {
         invalidName,
         validName,
         validName,
-        (name, githubTeam, awsAccount) => {
+        (name, githubTeam, iamGroup) => {
           const config: UsersConfig = {
-            users: [{ name, github_team: githubTeam, aws_account: awsAccount }],
+            users: [{ name, github_team: githubTeam, iam_group: iamGroup }],
           };
           expect(() => validateConfig(config)).toThrow();
         },
@@ -217,11 +217,11 @@ describe("validateConfig", () => {
         validName,
         validName,
         validName,
-        (name, githubTeam, awsAccount) => {
+        (name, githubTeam, iamGroup) => {
           const config: UsersConfig = {
             users: [
-              { name, github_team: githubTeam, aws_account: awsAccount },
-              { name, github_team: githubTeam, aws_account: awsAccount },
+              { name, github_team: githubTeam, iam_group: iamGroup },
+              { name, github_team: githubTeam, iam_group: iamGroup },
             ],
           };
           expect(() => validateConfig(config)).toThrow(/[Dd]uplicate/);
@@ -235,28 +235,28 @@ describe("validateConfig", () => {
 
   it("throws on name starting with hyphen", () => {
     const config: UsersConfig = {
-      users: [{ name: "-alice", github_team: "backend", aws_account: "dev" }],
+      users: [{ name: "-alice", github_team: "backend", iam_group: "dev" }],
     };
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
 
   it("throws on name ending with hyphen", () => {
     const config: UsersConfig = {
-      users: [{ name: "alice-", github_team: "backend", aws_account: "dev" }],
+      users: [{ name: "alice-", github_team: "backend", iam_group: "dev" }],
     };
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
 
   it("throws on uppercase characters in name", () => {
     const config: UsersConfig = {
-      users: [{ name: "Alice", github_team: "backend", aws_account: "dev" }],
+      users: [{ name: "Alice", github_team: "backend", iam_group: "dev" }],
     };
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
 
   it("throws on special characters in name", () => {
     const config: UsersConfig = {
-      users: [{ name: "alice!", github_team: "backend", aws_account: "dev" }],
+      users: [{ name: "alice!", github_team: "backend", iam_group: "dev" }],
     };
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
