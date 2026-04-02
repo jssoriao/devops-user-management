@@ -1,0 +1,7 @@
+users:
+  - name: alice
+    github_team: backend
+    aws_account: dev
+  - name: bob
+    github_team: frontend
+    aws_account: prod

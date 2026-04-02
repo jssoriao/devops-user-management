@@ -13,34 +13,34 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
   - Create empty `src/` and `tests/` directories with placeholder files
   - _Requirements: 1.1, 10.1_
 
-- [ ] 2. Implement configuration loading and validation
-  - [ ] 2.1 Create `src/config.ts` with `UserEntry` and `UsersConfig` interfaces
+- [x] 2. Implement configuration loading and validation
+  - [x] 2.1 Create `src/config.ts` with `UserEntry` and `UsersConfig` interfaces
     - Implement `loadConfig(filePath: string): UsersConfig` using `js-yaml` to parse the YAML file synchronously
     - Implement `validateConfig(config: UsersConfig): void` that checks: each user has `name`, `github_team`, `aws_account`; each `name` matches `/^[a-z0-9]+(-[a-z0-9]+)*$/`; no duplicate names
     - Throw descriptive errors for missing file, invalid YAML, missing fields, invalid characters, and duplicate names
     - _Requirements: 1.1, 1.4, 1.5, 6.3_
 
-  - [ ] 2.2 Create sample `users.yaml` configuration file
+  - [x] 2.2 Create sample `users.yaml` configuration file
     - Include at least two users with different `github_team` and `aws_account` values (e.g., alice/backend/dev, bob/frontend/prod)
     - _Requirements: 1.4_
 
-  - [ ]* 2.3 Write property test for config round-trip (Property 1)
+  - [x]* 2.3 Write property test for config round-trip (Property 1)
     - **Property 1: Config loading round-trip**
     - Use fast-check to generate random valid `UsersConfig` objects, serialize to YAML, load with `loadConfig`, and assert equivalence
     - **Validates: Requirements 1.1**
 
-  - [ ]* 2.4 Write property test for config validation rejects invalid input (Property 4)
+  - [x]* 2.4 Write property test for config validation rejects invalid input (Property 4)
     - **Property 4: Config validation rejects invalid input**
     - Use fast-check to generate user entries with missing fields or invalid characters and assert `validateConfig` throws
     - **Validates: Requirements 1.4, 1.5, 6.3**
 
-- [ ] 3. Implement naming convention utility
-  - [ ] 3.1 Create `src/naming.ts` with `resourceName(stackName: string, ...parts: string[]): string`
+- [x] 3. Implement naming convention utility
+  - [x] 3.1 Create `src/naming.ts` with `resourceName(stackName: string, ...parts: string[]): string`
     - Concatenate stack name and parts with hyphens, all lowercase
     - Validate all parts conform to `/^[a-z0-9]+(-[a-z0-9]+)*$/` and throw on invalid input
     - _Requirements: 6.1, 6.2_
 
-  - [ ]* 3.2 Write property test for naming convention output format (Property 3)
+  - [x]* 3.2 Write property test for naming convention output format (Property 3)
     - **Property 3: Naming convention output format**
     - Use fast-check to generate random valid stack names and name parts, assert output matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` and starts with stack name
     - **Validates: Requirements 6.1, 6.2, 2.2, 3.5, 4.2, 7.2**
@@ -49,7 +49,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Implement GitHub Team Component Resource
-  - [ ] 5.1 Create `src/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
+  - [x] 5.1 Create `src/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubTeamComponentArgs` with `teamSlug` and optional `description`
     - Create a `github.Team` resource with name derived via `resourceName`
     - Register outputs on the component
