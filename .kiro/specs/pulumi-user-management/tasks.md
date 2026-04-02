@@ -40,41 +40,46 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Validate all parts conform to `/^[a-z0-9]+(-[a-z0-9]+)*$/` and throw on invalid input
     - _Requirements: 6.1, 6.2_
 
-  - [x]\* 3.2 Write property test for naming convention output format (Property 3)
+  - [x] * 3.2 Write property test for naming convention output format (Property 3)
     - **Property 3: Naming convention output format**
     - Use fast-check to generate random valid stack names and name parts, assert output matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` and starts with stack name
     - **Validates: Requirements 6.1, 6.2, 2.2, 3.5, 4.2, 7.2**
 
-- [ ] 4. Checkpoint - Validate config and naming modules
+- [x] 4. Checkpoint - Validate config and naming modules
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement GitHub Team Component Resource
-  - [x] 5.1 Create `src/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
+- [x] 5. Create CI workflow for tests
+  - [x] 5.1 Create `.github/workflows/ci.yml` GitHub Actions workflow
+    - Run `pnpm install --frozen-lockfile` and `pnpm vitest --run` on every push to any branch and on every PR
+    - _Requirements: 10.1_
+
+- [ ] 6. Implement GitHub Team Component Resource
+  - [x] 6.1 Create `src/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubTeamComponentArgs` with `teamSlug` and optional `description`
     - Create a `github.Team` resource with name derived via `resourceName`
     - Register outputs on the component
     - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 6. Implement GitHub Membership Component Resource
-  - [ ] 6.1 Create `src/github-membership.ts` with `GitHubMembershipComponent` extending `pulumi.ComponentResource`
+- [ ] 7. Implement GitHub Membership Component Resource
+  - [ ] 7.1 Create `src/github-membership.ts` with `GitHubMembershipComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubMembershipComponentArgs` with `username`, `teamSlug`, and optional `role` (default `"member"`)
     - Create `github.Membership` for org-level membership and `github.TeamMembership` for team assignment
     - Derive GitHub username from user name using the naming convention
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ]\* 6.2 Write property test for default membership role (Property 6)
+  - [ ] * 7.2 Write property test for default membership role (Property 6)
     - **Property 6: Default membership role**
     - Use Pulumi mocks and fast-check to verify that memberships created without explicit role have role `"member"`
     - **Validates: Requirements 3.3**
 
-- [ ] 7. Implement AWS User Component Resource
-  - [ ] 7.1 Create `src/aws-user.ts` with `AWSUserComponent` extending `pulumi.ComponentResource`
+- [ ] 8. Implement AWS User Component Resource
+  - [ ] 8.1 Create `src/aws-user.ts` with `AWSUserComponent` extending `pulumi.ComponentResource`
     - Accept `AWSUserComponentArgs` with `username`, `groupName`, and optional `policyArn`
     - Create `aws.iam.User` and `aws.iam.UserGroupMembership`
     - _Requirements: 4.1, 4.2, 4.3, 4.5_
 
-- [ ] 8. Implement main entry point and orchestration
-  - [ ] 8.1 Create `index.ts` that wires all components together
+- [ ] 9. Implement main entry point and orchestration
+  - [ ] 9.1 Create `index.ts` that wires all components together
     - Load and validate config using `loadConfig` and `validateConfig`
     - Get stack name via `pulumi.getStack()`
     - Derive unique teams from `github_team` values and create `GitHubTeamComponent` for each
@@ -83,38 +88,38 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Iterate users and create `GitHubMembershipComponent` and `AWSUserComponent` for each, with correct `dependsOn`
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.3, 3.1, 3.2, 4.1, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4, 6.1, 7.2_
 
-  - [ ]\* 8.2 Write property test for resource count matches configuration (Property 2)
+  - [ ] * 9.2 Write property test for resource count matches configuration (Property 2)
     - **Property 2: Resource count matches configuration**
     - Use Pulumi mocks and fast-check to generate random valid configs and verify exactly N memberships, N AWS users, M teams, K groups are registered
     - **Validates: Requirements 1.2, 2.1, 3.1, 4.1, 4.4**
 
-  - [ ]\* 8.3 Write property test for team membership links to correct team (Property 5)
+  - [ ] * 9.3 Write property test for team membership links to correct team (Property 5)
     - **Property 5: Team membership links to correct team**
     - Use Pulumi mocks and fast-check to verify each `TeamMembership` references the correct team
     - **Validates: Requirements 3.2**
 
-  - [ ]\* 8.4 Write property test for IAM user assigned to correct group (Property 7)
+  - [ ] * 9.4 Write property test for IAM user assigned to correct group (Property 7)
     - **Property 7: IAM user assigned to correct group**
     - Use Pulumi mocks and fast-check to verify each `UserGroupMembership` references the correct IAM group
     - **Validates: Requirements 4.3**
 
-  - [ ]\* 8.5 Write property test for default policy attachment per IAM group (Property 8)
+  - [ ] * 9.5 Write property test for default policy attachment per IAM group (Property 8)
     - **Property 8: Default policy attachment per IAM group**
     - Use Pulumi mocks and fast-check to verify each group without custom policy has `ReadOnlyAccess` ARN attached
     - **Validates: Requirements 5.1, 5.2**
 
-- [ ] 9. Checkpoint - Validate all components and orchestration
+- [ ] 10. Checkpoint - Validate all components and orchestration
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Create Pulumi stack configuration files
-  - [ ] 10.1 Create `Pulumi.dev.yaml`, `Pulumi.staging.yaml`, and `Pulumi.prod.yaml`
+- [ ] 11. Create Pulumi stack configuration files
+  - [ ] 11.1 Create `Pulumi.dev.yaml`, `Pulumi.staging.yaml`, and `Pulumi.prod.yaml`
     - Each stack config references `usersFile` (path to `users.yaml` or environment-specific override)
     - Include placeholder for `github:token` as a Pulumi secret
     - Set `aws:region`
     - _Requirements: 7.1, 7.2, 7.3, 8.1, 8.2, 8.3_
 
-- [ ] 11. Implement unit tests with Pulumi mocks
-  - [ ] 11.1 Create `tests/index.test.ts` with Pulumi mock setup
+- [ ] 12. Implement unit tests with Pulumi mocks
+  - [ ] 12.1 Create `tests/index.test.ts` with Pulumi mock setup
     - Set up `pulumi.runtime.setMocks()` to mock resource creation
     - Test: two users/two teams config produces correct resource counts (2 teams, 2 memberships, 2 IAM users, corresponding groups)
     - Test: invalid config entry produces validation error
@@ -123,25 +128,24 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Test: custom policy ARN overrides default `ReadOnlyAccess`
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 12. Create CI pipeline configuration
-  - [ ] 12.1 Create `.github/workflows/deploy.yml` GitHub Actions workflow
+- [ ] 13. Create deploy pipeline configuration
+  - [ ] 13.1 Create `.github/workflows/deploy.yml` GitHub Actions workflow
     - On `pull_request` targeting `main`: run `pulumi preview`, post results to PR
     - On `push` to `main` (only via merged PR): run `pulumi up --yes`
     - Retrieve `PULUMI_ACCESS_TOKEN`, `GITHUB_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` from GitHub Actions secrets
-    - Include step to install dependencies and run tests before preview/deploy
     - Report "no changes" when preview detects no diff
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
 
-- [ ] 13. Create README documentation
-  - [ ] 13.1 Write `README.md` with complete project documentation
-    - Document how to install dependencies (`npm install`) and run the Pulumi project (`pulumi up`)
+- [ ] 14. Create README documentation
+  - [ ] 14.1 Write `README.md` with complete project documentation
+    - Document how to install dependencies (`pnpm install`) and run the Pulumi project (`pulumi up`)
     - Document how to add/remove users by editing `users.yaml`
     - Document assumptions (naming convention, default policies, org membership model)
     - Document how to configure secrets for GitHub and AWS providers (Pulumi config secrets, CI environment variables)
     - Document multi-environment usage with Pulumi stacks
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 14. Final checkpoint - Ensure all tests pass
+- [ ] 15. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
