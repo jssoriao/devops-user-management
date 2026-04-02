@@ -54,14 +54,14 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - _Requirements: 10.1_
 
 - [ ] 6. Implement GitHub Team Component Resource
-  - [x] 6.1 Create `src/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
+  - [ ] 6.1 Create `src/components/github-team.ts` with `GitHubTeamComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubTeamComponentArgs` with `teamSlug` and optional `description`
     - Create a `github.Team` resource with name derived via `resourceName`
     - Register outputs on the component
     - _Requirements: 2.1, 2.2, 2.4_
 
 - [ ] 7. Implement GitHub Membership Component Resource
-  - [ ] 7.1 Create `src/github-membership.ts` with `GitHubMembershipComponent` extending `pulumi.ComponentResource`
+  - [ ] 7.1 Create `src/components/github-membership.ts` with `GitHubMembershipComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubMembershipComponentArgs` with `username`, `teamSlug`, and optional `role` (default `"member"`)
     - Create `github.Membership` for org-level membership and `github.TeamMembership` for team assignment
     - Derive GitHub username from user name using the naming convention
@@ -73,7 +73,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - **Validates: Requirements 3.3**
 
 - [ ] 8. Implement AWS User Component Resource
-  - [ ] 8.1 Create `src/aws-user.ts` with `AWSUserComponent` extending `pulumi.ComponentResource`
+  - [ ] 8.1 Create `src/components/aws-user.ts` with `AWSUserComponent` extending `pulumi.ComponentResource`
     - Accept `AWSUserComponentArgs` with `username`, `groupName`, and optional `policyArn`
     - Create `aws.iam.User` and `aws.iam.UserGroupMembership`
     - _Requirements: 4.1, 4.2, 4.3, 4.5_

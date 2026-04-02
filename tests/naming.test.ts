@@ -4,7 +4,7 @@ import * as fc from "fast-check";
 import { resourceName, NAME_PATTERN } from "../src/naming";
 import { validName } from "./arbitraries";
 
-describe("Property 3: Naming convention output format", () => {
+describe("naming convention", () => {
   it("output matches /^[a-z0-9]+(-[a-z0-9]+)*$/ and starts with stack name", () => {
     fc.assert(
       fc.property(

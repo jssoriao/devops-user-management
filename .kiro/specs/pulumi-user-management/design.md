@@ -76,16 +76,23 @@ sequenceDiagram
 ├── src/
 │   ├── config.ts                # ConfigLoader: YAML parsing + validation
 │   ├── naming.ts                # Naming convention utilities
-│   ├── github-team.ts           # GitHubTeamComponent
-│   ├── github-membership.ts     # GitHubMembershipComponent
-│   └── aws-user.ts              # AWSUserComponent
+│   └── components/
+│       ├── github-team.ts       # GitHubTeamComponent
+│       ├── github-membership.ts # GitHubMembershipComponent
+│       └── aws-user.ts          # AWSUserComponent
 ├── tests/
+│   ├── arbitraries.ts           # Shared test arbitraries (fast-check generators)
+│   ├── config.test.ts           # Config loading + validation tests
+│   ├── naming.test.ts           # Naming convention tests
 │   └── index.test.ts            # Unit tests with Pulumi mocks
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml           # CI pipeline
+│       ├── ci.yml               # Test CI pipeline (every push/PR)
+│       └── deploy.yml           # Deploy pipeline (preview on PR, deploy on merge)
 ├── package.json
+├── pnpm-lock.yaml
 ├── tsconfig.json
+├── vitest.config.ts
 └── README.md
 ```
 
@@ -122,7 +129,7 @@ function resourceName(stackName: string, ...parts: string[]): string;
 
 Produces `{stackName}-{part1}-{part2}-...` in lowercase with hyphens. Validates that all parts conform to the allowed character set.
 
-### GitHubTeamComponent (`src/github-team.ts`)
+### GitHubTeamComponent (`src/components/github-team.ts`)
 
 ```typescript
 interface GitHubTeamComponentArgs {
@@ -138,7 +145,7 @@ class GitHubTeamComponent extends pulumi.ComponentResource {
 
 Creates a single `github.Team` resource. The resource name is derived via `resourceName(stackName, args.teamSlug)`.
 
-### GitHubMembershipComponent (`src/github-membership.ts`)
+### GitHubMembershipComponent (`src/components/github-membership.ts`)
 
 ```typescript
 interface GitHubMembershipComponentArgs {
@@ -156,7 +163,7 @@ class GitHubMembershipComponent extends pulumi.ComponentResource {
 
 Creates `github.Membership` (org-level) and `github.TeamMembership` (team-level). Role defaults to `"member"`.
 
-### AWSUserComponent (`src/aws-user.ts`)
+### AWSUserComponent (`src/components/aws-user.ts`)
 
 ```typescript
 interface AWSUserComponentArgs {
