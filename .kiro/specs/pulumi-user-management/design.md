@@ -133,13 +133,17 @@ Produces `{stackName}-{part1}-{part2}-...` in lowercase with hyphens. Validates 
 
 ```typescript
 interface GitHubTeamComponentArgs {
-  teamSlug: string;       // e.g. "backend"
+  teamSlug: string; // e.g. "backend"
   description?: string;
 }
 
 class GitHubTeamComponent extends pulumi.ComponentResource {
   public readonly team: github.Team;
-  constructor(name: string, args: GitHubTeamComponentArgs, opts?: pulumi.ComponentResourceOptions);
+  constructor(
+    name: string,
+    args: GitHubTeamComponentArgs,
+    opts?: pulumi.ComponentResourceOptions,
+  );
 }
 ```
 
@@ -149,15 +153,19 @@ Creates a single `github.Team` resource. The resource name is derived via `resou
 
 ```typescript
 interface GitHubMembershipComponentArgs {
-  username: string;       // derived from user name via naming convention
-  teamSlug: string;       // references the team to join
-  role?: string;          // defaults to "member"
+  username: string; // derived from user name via naming convention
+  teamSlug: string; // references the team to join
+  role?: string; // defaults to "member"
 }
 
 class GitHubMembershipComponent extends pulumi.ComponentResource {
   public readonly membership: github.Membership;
   public readonly teamMembership: github.TeamMembership;
-  constructor(name: string, args: GitHubMembershipComponentArgs, opts?: pulumi.ComponentResourceOptions);
+  constructor(
+    name: string,
+    args: GitHubMembershipComponentArgs,
+    opts?: pulumi.ComponentResourceOptions,
+  );
 }
 ```
 
@@ -168,14 +176,18 @@ Creates `github.Membership` (org-level) and `github.TeamMembership` (team-level)
 ```typescript
 interface AWSUserComponentArgs {
   username: string;
-  groupName: string;          // IAM group name (e.g. "dev-dev-account")
-  policyArn?: string;         // custom policy ARN; defaults to ReadOnlyAccess
+  groupName: string; // IAM group name (e.g. "dev-dev-account")
+  policyArn?: string; // custom policy ARN; defaults to ReadOnlyAccess
 }
 
 class AWSUserComponent extends pulumi.ComponentResource {
   public readonly user: aws.iam.User;
   public readonly groupMembership: aws.iam.UserGroupMembership;
-  constructor(name: string, args: AWSUserComponentArgs, opts?: pulumi.ComponentResourceOptions);
+  constructor(
+    name: string,
+    args: AWSUserComponentArgs,
+    opts?: pulumi.ComponentResourceOptions,
+  );
 }
 ```
 
@@ -191,13 +203,15 @@ validateConfig(config);
 const stackName = pulumi.getStack();
 
 // 1. Derive unique teams and groups
-const uniqueTeams = [...new Set(config.users.map(u => u.github_team))];
-const uniqueGroups = [...new Set(config.users.map(u => u.iam_group))];
+const uniqueTeams = [...new Set(config.users.map((u) => u.github_team))];
+const uniqueGroups = [...new Set(config.users.map((u) => u.iam_group))];
 
 // 2. Create GitHub teams
 const teams: Record<string, GitHubTeamComponent> = {};
 for (const team of uniqueTeams) {
-  teams[team] = new GitHubTeamComponent(resourceName(stackName, team), { teamSlug: team });
+  teams[team] = new GitHubTeamComponent(resourceName(stackName, team), {
+    teamSlug: team,
+  });
 }
 
 // 3. Create IAM groups + policy attachments
@@ -213,15 +227,23 @@ for (const group of uniqueGroups) {
 
 // 4. Create per-user resources
 for (const user of config.users) {
-  new GitHubMembershipComponent(resourceName(stackName, user.name, "github"), {
-    username: user.name,
-    teamSlug: user.github_team,
-  }, { dependsOn: [teams[user.github_team]] });
+  new GitHubMembershipComponent(
+    resourceName(stackName, user.name, "github"),
+    {
+      username: user.name,
+      teamSlug: user.github_team,
+    },
+    { dependsOn: [teams[user.github_team]] },
+  );
 
-  new AWSUserComponent(resourceName(stackName, user.name, "aws"), {
-    username: resourceName(stackName, user.name),
-    groupName: resourceName(stackName, user.iam_group),
-  }, { dependsOn: [groups[user.iam_group]] });
+  new AWSUserComponent(
+    resourceName(stackName, user.name, "aws"),
+    {
+      username: resourceName(stackName, user.name),
+      groupName: resourceName(stackName, user.iam_group),
+    },
+    { dependsOn: [groups[user.iam_group]] },
+  );
 }
 ```
 
@@ -240,6 +262,7 @@ users:
 ```
 
 **Constraints:**
+
 - `name`: required, must match `/^[a-z0-9]+(-[a-z0-9]+)*$/`
 - `github_team`: required, must match same pattern
 - `iam_group`: required, must match same pattern
@@ -251,9 +274,9 @@ Each stack file (`Pulumi.{env}.yaml`) contains:
 
 ```yaml
 config:
-  devops-user-management:usersFile: users.yaml        # path to config
+  devops-user-management:usersFile: users.yaml # path to config
   github:token:
-    secure: <encrypted-token>                          # Pulumi secret
+    secure: <encrypted-token> # Pulumi secret
   aws:region: us-east-1
 ```
 
@@ -261,64 +284,63 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 
 ### Resource Naming Model
 
-| Resource Type | Name Pattern | Example (stack=dev) |
-|---|---|---|
-| GitHub Team | `{teamSlug}` | `backend` |
-| GitHub Membership | `{username}-github` | `alice-github` |
-| IAM User | `{stack}-{username}` | `dev-alice` |
-| IAM Group | `{stack}-{iam_group}` | `dev-developers` |
-| IAM Group Policy | `{stack}-{iam_group}-policy` | `dev-developers-policy` |
-
+| Resource Type     | Name Pattern                 | Example (stack=dev)     |
+| ----------------- | ---------------------------- | ----------------------- |
+| GitHub Team       | `{teamSlug}`                 | `backend`               |
+| GitHub Membership | `{username}-github`          | `alice-github`          |
+| IAM User          | `{stack}-{username}`         | `dev-alice`             |
+| IAM Group         | `{stack}-{iam_group}`        | `dev-developers`        |
+| IAM Group Policy  | `{stack}-{iam_group}-policy` | `dev-developers-policy` |
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+_A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees._
 
 ### Property 1: Config loading round-trip
 
-*For any* valid `UsersConfig` object, serializing it to YAML and then loading it with `loadConfig` should produce an equivalent `UsersConfig` object.
+_For any_ valid `UsersConfig` object, serializing it to YAML and then loading it with `loadConfig` should produce an equivalent `UsersConfig` object.
 
 **Validates: Requirements 1.1**
 
 ### Property 2: Resource count matches configuration
 
-*For any* valid `UsersConfig` with N user entries, M unique `github_team` values, and K unique `iam_group` values, the Pulumi program should register exactly N GitHub membership components, N AWS user components, M GitHub team components, and K IAM groups.
+_For any_ valid `UsersConfig` with N user entries, M unique `github_team` values, and K unique `iam_group` values, the Pulumi program should register exactly N GitHub membership components, N AWS user components, M GitHub team components, and K IAM groups.
 
 **Validates: Requirements 1.2, 2.1, 3.1, 4.1, 4.4**
 
 ### Property 3: Naming convention output format
 
-*For any* valid stack name and any sequence of valid name parts, `resourceName(stackName, ...parts)` should produce a string that starts with the stack name, uses only lowercase alphanumeric characters and hyphens, and matches the pattern `/^[a-z0-9]+(-[a-z0-9]+)*$/`.
+_For any_ valid stack name and any sequence of valid name parts, `resourceName(stackName, ...parts)` should produce a string that starts with the stack name, uses only lowercase alphanumeric characters and hyphens, and matches the pattern `/^[a-z0-9]+(-[a-z0-9]+)*$/`.
 
 **Validates: Requirements 6.1, 6.2, 2.2, 3.5, 4.2, 7.2**
 
 ### Property 4: Config validation rejects invalid input
 
-*For any* user entry that is missing a required field (`name`, `github_team`, or `iam_group`) or whose `name` contains characters outside `/^[a-z0-9-]+$/`, `validateConfig` should throw a validation error.
+_For any_ user entry that is missing a required field (`name`, `github_team`, or `iam_group`) or whose `name` contains characters outside `/^[a-z0-9-]+$/`, `validateConfig` should throw a validation error.
 
 **Validates: Requirements 1.4, 1.5, 6.3**
 
 ### Property 5: Team membership links to correct team
 
-*For any* valid user entry with a `github_team` value, the created `TeamMembership` resource should reference the team ID of the `GitHubTeamComponent` created for that `github_team` value.
+_For any_ valid user entry with a `github_team` value, the created `TeamMembership` resource should reference the team ID of the `GitHubTeamComponent` created for that `github_team` value.
 
 **Validates: Requirements 3.2**
 
 ### Property 6: Default membership role
 
-*For any* GitHub membership created without an explicit role override, the membership role should be `"member"`.
+_For any_ GitHub membership created without an explicit role override, the membership role should be `"member"`.
 
 **Validates: Requirements 3.3**
 
 ### Property 7: IAM user assigned to correct group
 
-*For any* valid user entry with an `iam_group` value, the created `UserGroupMembership` resource should reference the IAM group corresponding to that `iam_group` value.
+_For any_ valid user entry with an `iam_group` value, the created `UserGroupMembership` resource should reference the IAM group corresponding to that `iam_group` value.
 
 **Validates: Requirements 4.3**
 
 ### Property 8: Default policy attachment per IAM group
 
-*For any* IAM group created without a custom policy ARN, the group should have exactly one `GroupPolicyAttachment` with the ARN `arn:aws:iam::aws:policy/ReadOnlyAccess`.
+_For any_ IAM group created without a custom policy ARN, the group should have exactly one `GroupPolicyAttachment` with the ARN `arn:aws:iam::aws:policy/ReadOnlyAccess`.
 
 **Validates: Requirements 5.1, 5.2**
 
@@ -326,22 +348,22 @@ AWS credentials are provided via environment variables (`AWS_ACCESS_KEY_ID`, `AW
 
 ### Configuration Errors
 
-| Error Condition | Behavior | Timing |
-|---|---|---|
-| `users.yaml` file not found | Throw `Error` with message indicating file path | Before resource creation |
-| Invalid YAML syntax | Throw `Error` with YAML parse error details | Before resource creation |
-| Missing required field (`name`, `github_team`, `iam_group`) | Throw `Error` listing the missing field and user index | Before resource creation |
-| Invalid characters in `name` | Throw `Error` with the offending name and allowed pattern | Before resource creation |
-| Duplicate user `name` | Throw `Error` listing the duplicate name | Before resource creation |
+| Error Condition                                             | Behavior                                                  | Timing                   |
+| ----------------------------------------------------------- | --------------------------------------------------------- | ------------------------ |
+| `users.yaml` file not found                                 | Throw `Error` with message indicating file path           | Before resource creation |
+| Invalid YAML syntax                                         | Throw `Error` with YAML parse error details               | Before resource creation |
+| Missing required field (`name`, `github_team`, `iam_group`) | Throw `Error` listing the missing field and user index    | Before resource creation |
+| Invalid characters in `name`                                | Throw `Error` with the offending name and allowed pattern | Before resource creation |
+| Duplicate user `name`                                       | Throw `Error` listing the duplicate name                  | Before resource creation |
 
 ### Provider Errors
 
-| Error Condition | Behavior |
-|---|---|
-| GitHub API authentication failure | Pulumi reports provider error; CI pipeline fails |
-| AWS API authentication failure | Pulumi reports provider error; CI pipeline fails |
+| Error Condition                   | Behavior                                                        |
+| --------------------------------- | --------------------------------------------------------------- |
+| GitHub API authentication failure | Pulumi reports provider error; CI pipeline fails                |
+| AWS API authentication failure    | Pulumi reports provider error; CI pipeline fails                |
 | GitHub user does not exist in org | `github.Membership` resource creation fails with provider error |
-| IAM policy ARN does not exist | `GroupPolicyAttachment` fails with AWS error |
+| IAM policy ARN does not exist     | `GroupPolicyAttachment` fails with AWS error                    |
 
 ### CI Pipeline Errors
 
@@ -371,26 +393,26 @@ Both are complementary. Unit tests catch concrete bugs with known inputs. Proper
 
 ### Unit Test Plan
 
-| Test Case | What It Verifies | Type |
-|---|---|---|
-| Two users, two teams config → correct resource counts | Req 10.2 | Example |
-| Invalid config entry → validation error | Req 10.3 | Example |
+| Test Case                                              | What It Verifies  | Type    |
+| ------------------------------------------------------ | ----------------- | ------- |
+| Two users, two teams config → correct resource counts  | Req 10.2          | Example |
+| Invalid config entry → validation error                | Req 10.3          | Example |
 | Component Resources are `instanceof ComponentResource` | Req 2.4, 3.4, 4.5 | Example |
-| Custom policy ARN overrides default | Req 5.3 | Example |
-| CI workflow file exists and has correct structure | Req 9.1 | Example |
+| Custom policy ARN overrides default                    | Req 5.3           | Example |
+| CI workflow file exists and has correct structure      | Req 9.1           | Example |
 
 ### Property Test Plan
 
-| Property | Generator | Assertion |
-|---|---|---|
-| P1: Config round-trip | Random `UsersConfig` objects with valid names/teams/accounts | `loadConfig(serialize(config))` equals original |
-| P2: Resource count | Random valid configs with varying user/team/group counts | Mock resource counts match expected |
-| P3: Naming format | Random valid stack names and name parts | Output matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` and starts with stack name |
-| P4: Validation rejects invalid | Random user entries with missing fields or invalid chars | `validateConfig` throws |
-| P5: Team membership correctness | Random valid configs | Each TeamMembership references correct team |
-| P6: Default role | Random valid users without role override | Membership role is `"member"` |
-| P7: Group membership correctness | Random valid configs | Each UserGroupMembership references correct group |
-| P8: Default policy | Random valid configs without custom policy | GroupPolicyAttachment ARN is ReadOnlyAccess |
+| Property                         | Generator                                                    | Assertion                                                              |
+| -------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| P1: Config round-trip            | Random `UsersConfig` objects with valid names/teams/accounts | `loadConfig(serialize(config))` equals original                        |
+| P2: Resource count               | Random valid configs with varying user/team/group counts     | Mock resource counts match expected                                    |
+| P3: Naming format                | Random valid stack names and name parts                      | Output matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` and starts with stack name |
+| P4: Validation rejects invalid   | Random user entries with missing fields or invalid chars     | `validateConfig` throws                                                |
+| P5: Team membership correctness  | Random valid configs                                         | Each TeamMembership references correct team                            |
+| P6: Default role                 | Random valid users without role override                     | Membership role is `"member"`                                          |
+| P7: Group membership correctness | Random valid configs                                         | Each UserGroupMembership references correct group                      |
+| P8: Default policy               | Random valid configs without custom policy                   | GroupPolicyAttachment ARN is ReadOnlyAccess                            |
 
 ### Test Execution
 

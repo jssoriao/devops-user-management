@@ -24,15 +24,15 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Include at least two users with different `github_team` and `iam_group` values (e.g., alice/backend/dev, bob/frontend/prod)
     - _Requirements: 1.4_
 
-  - [x] * 2.3 Write property test for config round-trip (Property 1)
-    - **Property 1: Config loading round-trip**
-    - Use fast-check to generate random valid `UsersConfig` objects, serialize to YAML, load with `loadConfig`, and assert equivalence
-    - **Validates: Requirements 1.1**
+  - [x] - 2.3 Write property test for config round-trip (Property 1)
+    * **Property 1: Config loading round-trip**
+    * Use fast-check to generate random valid `UsersConfig` objects, serialize to YAML, load with `loadConfig`, and assert equivalence
+    * **Validates: Requirements 1.1**
 
-  - [x] * 2.4 Write property test for config validation rejects invalid input (Property 4)
-    - **Property 4: Config validation rejects invalid input**
-    - Use fast-check to generate user entries with missing fields or invalid characters and assert `validateConfig` throws
-    - **Validates: Requirements 1.4, 1.5, 6.3**
+  - [x] - 2.4 Write property test for config validation rejects invalid input (Property 4)
+    * **Property 4: Config validation rejects invalid input**
+    * Use fast-check to generate user entries with missing fields or invalid characters and assert `validateConfig` throws
+    * **Validates: Requirements 1.4, 1.5, 6.3**
 
 - [x] 3. Implement naming convention utility
   - [x] 3.1 Create `src/naming.ts` with `resourceName(stackName: string, ...parts: string[]): string`
@@ -40,10 +40,10 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Validate all parts conform to `/^[a-z0-9]+(-[a-z0-9]+)*$/` and throw on invalid input
     - _Requirements: 6.1, 6.2_
 
-  - [x] * 3.2 Write property test for naming convention output format (Property 3)
-    - **Property 3: Naming convention output format**
-    - Use fast-check to generate random valid stack names and name parts, assert output matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` and starts with stack name
-    - **Validates: Requirements 6.1, 6.2, 2.2, 3.5, 4.2, 7.2**
+  - [x] - 3.2 Write property test for naming convention output format (Property 3)
+    * **Property 3: Naming convention output format**
+    * Use fast-check to generate random valid stack names and name parts, assert output matches `/^[a-z0-9]+(-[a-z0-9]+)*$/` and starts with stack name
+    * **Validates: Requirements 6.1, 6.2, 2.2, 3.5, 4.2, 7.2**
 
 - [x] 4. Checkpoint - Validate config and naming modules
   - Ensure all tests pass, ask the user if questions arise.
@@ -67,10 +67,10 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Derive GitHub username from user name using the naming convention
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ] * 7.2 Write property test for default membership role (Property 6)
-    - **Property 6: Default membership role**
-    - Use Pulumi mocks and fast-check to verify that memberships created without explicit role have role `"member"`
-    - **Validates: Requirements 3.3**
+  - [ ] - 7.2 Write property test for default membership role (Property 6)
+    * **Property 6: Default membership role**
+    * Use Pulumi mocks and fast-check to verify that memberships created without explicit role have role `"member"`
+    * **Validates: Requirements 3.3**
 
 - [ ] 8. Implement AWS User Component Resource
   - [ ] 8.1 Create `src/components/aws-user.ts` with `AWSUserComponent` extending `pulumi.ComponentResource`
@@ -88,25 +88,25 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Iterate users and create `GitHubMembershipComponent` and `AWSUserComponent` for each, with correct `dependsOn`
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.3, 3.1, 3.2, 4.1, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4, 6.1, 7.2_
 
-  - [ ] * 9.2 Write property test for resource count matches configuration (Property 2)
-    - **Property 2: Resource count matches configuration**
-    - Use Pulumi mocks and fast-check to generate random valid configs and verify exactly N memberships, N AWS users, M teams, K groups are registered
-    - **Validates: Requirements 1.2, 2.1, 3.1, 4.1, 4.4**
+  - [ ] - 9.2 Write property test for resource count matches configuration (Property 2)
+    * **Property 2: Resource count matches configuration**
+    * Use Pulumi mocks and fast-check to generate random valid configs and verify exactly N memberships, N AWS users, M teams, K groups are registered
+    * **Validates: Requirements 1.2, 2.1, 3.1, 4.1, 4.4**
 
-  - [ ] * 9.3 Write property test for team membership links to correct team (Property 5)
-    - **Property 5: Team membership links to correct team**
-    - Use Pulumi mocks and fast-check to verify each `TeamMembership` references the correct team
-    - **Validates: Requirements 3.2**
+  - [ ] - 9.3 Write property test for team membership links to correct team (Property 5)
+    * **Property 5: Team membership links to correct team**
+    * Use Pulumi mocks and fast-check to verify each `TeamMembership` references the correct team
+    * **Validates: Requirements 3.2**
 
-  - [ ] * 9.4 Write property test for IAM user assigned to correct group (Property 7)
-    - **Property 7: IAM user assigned to correct group**
-    - Use Pulumi mocks and fast-check to verify each `UserGroupMembership` references the correct IAM group
-    - **Validates: Requirements 4.3**
+  - [ ] - 9.4 Write property test for IAM user assigned to correct group (Property 7)
+    * **Property 7: IAM user assigned to correct group**
+    * Use Pulumi mocks and fast-check to verify each `UserGroupMembership` references the correct IAM group
+    * **Validates: Requirements 4.3**
 
-  - [ ] * 9.5 Write property test for default policy attachment per IAM group (Property 8)
-    - **Property 8: Default policy attachment per IAM group**
-    - Use Pulumi mocks and fast-check to verify each group without custom policy has `ReadOnlyAccess` ARN attached
-    - **Validates: Requirements 5.1, 5.2**
+  - [ ] - 9.5 Write property test for default policy attachment per IAM group (Property 8)
+    * **Property 8: Default policy attachment per IAM group**
+    * Use Pulumi mocks and fast-check to verify each group without custom policy has `ReadOnlyAccess` ARN attached
+    * **Validates: Requirements 5.1, 5.2**
 
 - [ ] 10. Checkpoint - Validate all components and orchestration
   - Ensure all tests pass, ask the user if questions arise.

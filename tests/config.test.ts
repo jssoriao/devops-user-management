@@ -75,9 +75,7 @@ describe("loadConfig", () => {
             expect(loaded.users[i].github_team).toBe(
               config.users[i].github_team,
             );
-            expect(loaded.users[i].iam_group).toBe(
-              config.users[i].iam_group,
-            );
+            expect(loaded.users[i].iam_group).toBe(config.users[i].iam_group);
           }
         } finally {
           fs.unlinkSync(tmpFile);
@@ -170,9 +168,7 @@ describe("validateConfig", () => {
     fc.assert(
       fc.property(validName, validName, (name, iamGroup) => {
         const config: UsersConfig = {
-          users: [
-            { name, github_team: undefined as any, iam_group: iamGroup },
-          ],
+          users: [{ name, github_team: undefined as any, iam_group: iamGroup }],
         };
         expect(() => validateConfig(config)).toThrow();
       }),

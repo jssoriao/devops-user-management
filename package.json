@@ -4,20 +4,28 @@
   "description": "Pulumi project for managing GitHub teams/memberships and AWS IAM users from YAML config",
   "main": "index.ts",
   "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest --run --reporter verbose",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@pulumi/pulumi": "^3.0.0",
-    "@pulumi/github": "^6.0.0",
     "@pulumi/aws": "^6.0.0",
+    "@pulumi/github": "^6.0.0",
+    "@pulumi/pulumi": "^3.0.0",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0",
+    "@eslint/js": "^10.0.1",
+    "@types/js-yaml": "^4.0.0",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
     "fast-check": "^3.0.0",
-    "@types/js-yaml": "^4.0.0"
+    "prettier": "^3.8.1",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^1.0.0"
   },
   "packageManager": "pnpm@10.31.0"
 }
