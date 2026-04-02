@@ -60,14 +60,14 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Register outputs on the component
     - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 7. Implement GitHub Membership Component Resource
-  - [ ] 7.1 Create `src/components/github-membership.ts` with `GitHubMembershipComponent` extending `pulumi.ComponentResource`
+- [x] 7. Implement GitHub Membership Component Resource
+  - [x] 7.1 Create `src/components/github-membership.ts` with `GitHubMembershipComponent` extending `pulumi.ComponentResource`
     - Accept `GitHubMembershipComponentArgs` with `username`, `teamSlug`, and optional `role` (default `"member"`)
     - Create `github.Membership` for org-level membership and `github.TeamMembership` for team assignment
     - Derive GitHub username from user name using the naming convention
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ] - 7.2 Write property test for default membership role (Property 6)
+  - [x] - 7.2 Write property test for default membership role (Property 6)
     * **Property 6: Default membership role**
     * Use Pulumi mocks and fast-check to verify that memberships created without explicit role have role `"member"`
     * **Validates: Requirements 3.3**
