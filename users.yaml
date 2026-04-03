@@ -1,7 +1,39 @@
+aws_accounts:
+  - name: dev
+  - name: prod
+
+github_teams:
+  - name: backend
+    description: "Backend engineering team"
+    privacy: closed
+  - name: frontend
+    description: "Frontend engineering team"
+    privacy: closed
+
+iam_groups:
+  - name: backend-developers
+    account: dev
+    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+  - name: backend-developers
+    account: prod
+    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+  - name: frontend-developers
+    account: dev
+    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+  - name: frontend-developers
+    account: prod
+    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+
 users:
   - name: alice
     github_team: backend
-    iam_group: backend-developers
+    iam_assignments:
+      - account: dev
+        iam_group: backend-developers
+      - account: prod
+        iam_group: backend-developers
   - name: bob
     github_team: frontend
-    iam_group: frontend-developers
+    iam_assignments:
+      - account: dev
+        iam_group: frontend-developers

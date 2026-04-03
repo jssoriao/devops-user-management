@@ -5,44 +5,8 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 
-import {
-  loadConfig,
-  validateConfig,
-  UsersConfig,
-  UserEntry,
-} from "../src/config";
-import { validName } from "./arbitraries";
-
-// -- Test arbitraries --
-
-const validUserEntry: fc.Arbitrary<UserEntry> = fc.record({
-  name: validName,
-  github_team: validName,
-  iam_group: validName,
-});
-
-/** UsersConfig with unique user names */
-const validUsersConfig: fc.Arbitrary<UsersConfig> = fc
-  .array(validUserEntry, { minLength: 1, maxLength: 10 })
-  .map((users) => {
-    const seen = new Set<string>();
-    const unique = users.filter((u) => {
-      if (seen.has(u.name)) return false;
-      seen.add(u.name);
-      return true;
-    });
-    return { users: unique.length > 0 ? unique : [users[0]] };
-  });
-
-/** Name containing at least one invalid character */
-const invalidName = fc.oneof(
-  fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /[A-Z]/.test(s)),
-  validName.map((n) => n + "!"),
-  validName.map((n) => n + " x"),
-  validName.map((n) => "-" + n),
-  validName.map((n) => n + "-"),
-  fc.constant(""),
-);
+import { loadConfig, validateConfig, UsersConfig } from "../src/config";
+import { validName, validUsersConfig, invalidName } from "./arbitraries";
 
 // -- Helpers --
 
@@ -55,27 +19,47 @@ function writeTempFile(content: string): string {
   return tmpFile;
 }
 
+function makeMinimalConfig(overrides?: Partial<UsersConfig>): UsersConfig {
+  return {
+    aws_accounts: [{ name: "dev" }],
+    github_teams: [{ name: "backend" }],
+    iam_groups: [{ name: "developers", account: "dev" }],
+    users: [
+      {
+        name: "alice",
+        github_team: "backend",
+        iam_assignments: [{ account: "dev", iam_group: "developers" }],
+      },
+    ],
+    ...overrides,
+  };
+}
+
 // =============================================================================
 // loadConfig: YAML file parsing and structural validation
 // =============================================================================
 
 describe("loadConfig", () => {
-  // -- Property 1: Config loading round-trip --
-  // Feature: devops-user-management, Property 1: Config loading round-trip
-  // Validates: Requirements 1.1
-  it("round-trips valid config through YAML serialize/deserialize", () => {
+  // Feature: pulumi-user-management, Property 1: Config loading round-trip
+  // Validates: Requirements 1.1, 1.2, 1.3
+  it("round-trips valid four-section config through YAML serialize/deserialize", () => {
     fc.assert(
       fc.property(validUsersConfig, (config) => {
         const tmpFile = writeTempFile(yamlDump(config));
         try {
           const loaded = loadConfig(tmpFile);
+          expect(loaded.aws_accounts.length).toBe(config.aws_accounts.length);
+          expect(loaded.github_teams.length).toBe(config.github_teams.length);
+          expect(loaded.iam_groups.length).toBe(config.iam_groups.length);
           expect(loaded.users.length).toBe(config.users.length);
           for (let i = 0; i < config.users.length; i++) {
             expect(loaded.users[i].name).toBe(config.users[i].name);
             expect(loaded.users[i].github_team).toBe(
               config.users[i].github_team,
             );
-            expect(loaded.users[i].iam_group).toBe(config.users[i].iam_group);
+            expect(loaded.users[i].iam_assignments).toEqual(
+              config.users[i].iam_assignments,
+            );
           }
         } finally {
           fs.unlinkSync(tmpFile);
@@ -85,7 +69,6 @@ describe("loadConfig", () => {
     );
   });
 
-  // -- Failure cases: file system and YAML structure errors --
   it("throws when file does not exist", () => {
     expect(() => loadConfig("/nonexistent/path/users.yaml")).toThrow(
       /Configuration file not found/,
@@ -103,34 +86,70 @@ describe("loadConfig", () => {
     }
   });
 
-  it("throws when YAML has no users array", () => {
-    const tmpFile = writeTempFile("teams:\n  - backend\n  - frontend");
-    try {
-      expect(() => loadConfig(tmpFile)).toThrow(
-        /expected an object with a "users" array/,
-      );
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
-  });
-
   it("throws when YAML is empty", () => {
     const tmpFile = writeTempFile("");
     try {
-      expect(() => loadConfig(tmpFile)).toThrow(
-        /expected an object with a "users" array/,
-      );
+      expect(() => loadConfig(tmpFile)).toThrow(/Invalid configuration/);
     } finally {
       fs.unlinkSync(tmpFile);
     }
   });
 
-  it("throws when users is not an array", () => {
-    const tmpFile = writeTempFile("users: not-an-array");
+  it("throws when aws_accounts section is missing", () => {
+    const tmpFile = writeTempFile(
+      yamlDump({
+        github_teams: [{ name: "backend" }],
+        iam_groups: [{ name: "dev", account: "dev" }],
+        users: [],
+      }),
+    );
     try {
-      expect(() => loadConfig(tmpFile)).toThrow(
-        /expected an object with a "users" array/,
-      );
+      expect(() => loadConfig(tmpFile)).toThrow(/aws_accounts/);
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("throws when github_teams section is missing", () => {
+    const tmpFile = writeTempFile(
+      yamlDump({
+        aws_accounts: [{ name: "dev" }],
+        iam_groups: [{ name: "dev", account: "dev" }],
+        users: [],
+      }),
+    );
+    try {
+      expect(() => loadConfig(tmpFile)).toThrow(/github_teams/);
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("throws when iam_groups section is missing", () => {
+    const tmpFile = writeTempFile(
+      yamlDump({
+        aws_accounts: [{ name: "dev" }],
+        github_teams: [{ name: "backend" }],
+        users: [],
+      }),
+    );
+    try {
+      expect(() => loadConfig(tmpFile)).toThrow(/iam_groups/);
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("throws when users section is missing", () => {
+    const tmpFile = writeTempFile(
+      yamlDump({
+        aws_accounts: [{ name: "dev" }],
+        github_teams: [{ name: "backend" }],
+        iam_groups: [{ name: "dev", account: "dev" }],
+      }),
+    );
+    try {
+      expect(() => loadConfig(tmpFile)).toThrow(/users/);
     } finally {
       fs.unlinkSync(tmpFile);
     }
@@ -142,118 +161,514 @@ describe("loadConfig", () => {
 // =============================================================================
 
 describe("validateConfig", () => {
-  // -- Property 4: Validation rejects invalid input (property-based) --
-  // Feature: devops-user-management, Property 4: Config validation rejects invalid input
-  // Validates: Requirements 1.4, 1.5, 6.3
+  // Feature: pulumi-user-management, Property 4: Validation rejects missing required fields
+  // Validates: Requirements 1.5, 1.6, 1.7, 1.8, 6.5, 7.3
 
-  it("rejects random entries with missing name (property)", () => {
+  it("accepts a valid minimal config", () => {
+    expect(() => validateConfig(makeMinimalConfig())).not.toThrow();
+  });
+
+  it("rejects user with missing name (property)", () => {
     fc.assert(
-      fc.property(validName, validName, (githubTeam, iamGroup) => {
-        const config: UsersConfig = {
+      fc.property(validName, validName, (team, group) => {
+        const config = makeMinimalConfig({
+          github_teams: [{ name: team }],
+          iam_groups: [{ name: group, account: "dev" }],
           users: [
             {
               name: undefined as any,
-              github_team: githubTeam,
-              iam_group: iamGroup,
+              github_team: team,
+              iam_assignments: [{ account: "dev", iam_group: group }],
             },
           ],
-        };
-        expect(() => validateConfig(config)).toThrow();
+        });
+        expect(() => validateConfig(config)).toThrow(
+          /missing required field "name"/,
+        );
       }),
       { numRuns: 100 },
     );
   });
 
-  it("rejects random entries with missing github_team (property)", () => {
+  it("rejects user with missing github_team (property)", () => {
     fc.assert(
-      fc.property(validName, validName, (name, iamGroup) => {
-        const config: UsersConfig = {
-          users: [{ name, github_team: undefined as any, iam_group: iamGroup }],
-        };
-        expect(() => validateConfig(config)).toThrow();
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it("rejects random entries with missing iam_group (property)", () => {
-    fc.assert(
-      fc.property(validName, validName, (name, githubTeam) => {
-        const config: UsersConfig = {
+      fc.property(validName, validName, (name, group) => {
+        const config = makeMinimalConfig({
+          iam_groups: [{ name: group, account: "dev" }],
           users: [
-            { name, github_team: githubTeam, iam_group: undefined as any },
+            {
+              name,
+              github_team: undefined as any,
+              iam_assignments: [{ account: "dev", iam_group: group }],
+            },
           ],
-        };
+        });
+        expect(() => validateConfig(config)).toThrow(
+          /missing required field "github_team"/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects user with missing iam_assignments (property)", () => {
+    fc.assert(
+      fc.property(validName, (name) => {
+        const config = makeMinimalConfig({
+          users: [
+            {
+              name,
+              github_team: "backend",
+              iam_assignments: undefined as any,
+            },
+          ],
+        });
+        expect(() => validateConfig(config)).toThrow(/iam_assignments/);
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects user with empty iam_assignments array", () => {
+    const config = makeMinimalConfig({
+      users: [{ name: "alice", github_team: "backend", iam_assignments: [] }],
+    });
+    expect(() => validateConfig(config)).toThrow(/iam_assignments/);
+  });
+
+  it("rejects iam_assignment missing account", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github_team: "backend",
+          iam_assignments: [
+            { account: undefined as any, iam_group: "developers" },
+          ],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /missing required field "account"/,
+    );
+  });
+
+  it("rejects iam_assignment missing iam_group", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: undefined as any }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /missing required field "iam_group"/,
+    );
+  });
+
+  it("rejects aws_account with missing name", () => {
+    const config = makeMinimalConfig({
+      aws_accounts: [{ name: undefined as any }],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /AWS account.*missing required field "name"/,
+    );
+  });
+
+  it("rejects github_team with missing name", () => {
+    const config = makeMinimalConfig({
+      github_teams: [{ name: undefined as any }],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /GitHub team.*missing required field "name"/,
+    );
+  });
+
+  it("rejects iam_group with missing name", () => {
+    const config = makeMinimalConfig({
+      iam_groups: [{ name: undefined as any, account: "dev" }],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /IAM group.*missing required field "name"/,
+    );
+  });
+
+  it("rejects iam_group with missing account", () => {
+    const config = makeMinimalConfig({
+      iam_groups: [{ name: "developers", account: undefined as any }],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /IAM group.*missing required field "account"/,
+    );
+  });
+
+  it("rejects invalid privacy value on github_team", () => {
+    const config = makeMinimalConfig({
+      github_teams: [{ name: "backend", privacy: "open" as any }],
+    });
+    expect(() => validateConfig(config)).toThrow(/invalid privacy value/);
+  });
+
+  it("rejects invalid characters in user name (property)", () => {
+    fc.assert(
+      fc.property(invalidName, (name) => {
+        const config = makeMinimalConfig({
+          users: [
+            {
+              name,
+              github_team: "backend",
+              iam_assignments: [{ account: "dev", iam_group: "developers" }],
+            },
+          ],
+        });
         expect(() => validateConfig(config)).toThrow();
       }),
       { numRuns: 100 },
     );
   });
 
-  it("rejects random entries with invalid characters in name (property)", () => {
-    fc.assert(
-      fc.property(
-        invalidName,
-        validName,
-        validName,
-        (name, githubTeam, iamGroup) => {
-          const config: UsersConfig = {
-            users: [{ name, github_team: githubTeam, iam_group: iamGroup }],
-          };
-          expect(() => validateConfig(config)).toThrow();
-        },
-      ),
-      { numRuns: 100 },
-    );
-  });
-
-  it("rejects random configs with duplicate user names (property)", () => {
-    fc.assert(
-      fc.property(
-        validName,
-        validName,
-        validName,
-        (name, githubTeam, iamGroup) => {
-          const config: UsersConfig = {
-            users: [
-              { name, github_team: githubTeam, iam_group: iamGroup },
-              { name, github_team: githubTeam, iam_group: iamGroup },
-            ],
-          };
-          expect(() => validateConfig(config)).toThrow(/[Dd]uplicate/);
-        },
-      ),
-      { numRuns: 100 },
-    );
-  });
-
-  // -- Edge cases: specific naming pattern violations --
-
+  // Edge cases for naming pattern
   it("throws on name starting with hyphen", () => {
-    const config: UsersConfig = {
-      users: [{ name: "-alice", github_team: "backend", iam_group: "dev" }],
-    };
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "-alice",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
 
   it("throws on name ending with hyphen", () => {
-    const config: UsersConfig = {
-      users: [{ name: "alice-", github_team: "backend", iam_group: "dev" }],
-    };
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice-",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
 
   it("throws on uppercase characters in name", () => {
-    const config: UsersConfig = {
-      users: [{ name: "Alice", github_team: "backend", iam_group: "dev" }],
-    };
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "Alice",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
   });
 
   it("throws on special characters in name", () => {
-    const config: UsersConfig = {
-      users: [{ name: "alice!", github_team: "backend", iam_group: "dev" }],
-    };
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice!",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
     expect(() => validateConfig(config)).toThrow(/invalid name/i);
+  });
+
+  // Duplicate checks
+  it("rejects duplicate user names", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+        {
+          name: "alice",
+          github_team: "backend",
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(/[Dd]uplicate user name/);
+  });
+
+  it("rejects duplicate aws_account names", () => {
+    const config = makeMinimalConfig({
+      aws_accounts: [{ name: "dev" }, { name: "dev" }],
+    });
+    expect(() => validateConfig(config)).toThrow(/[Dd]uplicate AWS account/);
+  });
+
+  it("rejects duplicate github_team names", () => {
+    const config = makeMinimalConfig({
+      github_teams: [{ name: "backend" }, { name: "backend" }],
+    });
+    expect(() => validateConfig(config)).toThrow(/[Dd]uplicate GitHub team/);
+  });
+
+  it("rejects duplicate iam_group name+account pair", () => {
+    const config = makeMinimalConfig({
+      iam_groups: [
+        { name: "developers", account: "dev" },
+        { name: "developers", account: "dev" },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(/[Dd]uplicate IAM group/);
+  });
+
+  it("accepts same iam_group name in different accounts", () => {
+    const config = makeMinimalConfig({
+      aws_accounts: [{ name: "dev" }, { name: "prod" }],
+      iam_groups: [
+        { name: "developers", account: "dev" },
+        { name: "developers", account: "prod" },
+      ],
+    });
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+});
+
+// =============================================================================
+// Cross-reference validation (Property 5)
+// =============================================================================
+
+describe("cross-reference validation", () => {
+  // Feature: pulumi-user-management, Property 5: Cross-reference validation rejects unresolved references
+  // Validates: Requirements 6.1, 6.2, 6.3, 6.4
+
+  it("rejects user referencing non-existent github_team (property)", () => {
+    fc.assert(
+      fc.property(validName, validName, (userName, badTeam) => {
+        fc.pre(badTeam !== "backend"); // ensure it doesn't accidentally match
+        const config = makeMinimalConfig({
+          users: [
+            {
+              name: userName,
+              github_team: badTeam,
+              iam_assignments: [{ account: "dev", iam_group: "developers" }],
+            },
+          ],
+        });
+        expect(() => validateConfig(config)).toThrow(
+          /references non-existent GitHub team/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects user iam_assignment referencing non-existent account (property)", () => {
+    fc.assert(
+      fc.property(validName, validName, (userName, badAccount) => {
+        fc.pre(badAccount !== "dev");
+        const config = makeMinimalConfig({
+          users: [
+            {
+              name: userName,
+              github_team: "backend",
+              iam_assignments: [
+                { account: badAccount, iam_group: "developers" },
+              ],
+            },
+          ],
+        });
+        expect(() => validateConfig(config)).toThrow(
+          /references non-existent account/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects user iam_assignment referencing group not defined for that account (property)", () => {
+    fc.assert(
+      fc.property(validName, validName, (userName, badGroup) => {
+        fc.pre(badGroup !== "developers");
+        const config = makeMinimalConfig({
+          users: [
+            {
+              name: userName,
+              github_team: "backend",
+              iam_assignments: [{ account: "dev", iam_group: badGroup }],
+            },
+          ],
+        });
+        expect(() => validateConfig(config)).toThrow(
+          /references non-existent IAM group/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects iam_groups entry referencing non-existent account (property)", () => {
+    fc.assert(
+      fc.property(validName, (badAccount) => {
+        fc.pre(badAccount !== "dev");
+        const config = makeMinimalConfig({
+          iam_groups: [{ name: "developers", account: badAccount }],
+        });
+        expect(() => validateConfig(config)).toThrow(
+          /references non-existent account/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects user referencing group in wrong account", () => {
+    const config = makeMinimalConfig({
+      aws_accounts: [{ name: "dev" }, { name: "prod" }],
+      iam_groups: [{ name: "developers", account: "dev" }],
+      users: [
+        {
+          name: "alice",
+          github_team: "backend",
+          iam_assignments: [{ account: "prod", iam_group: "developers" }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /references non-existent IAM group "developers" in account "prod"/,
+    );
+  });
+});
+
+// =============================================================================
+// Duplicate validation (Property 6)
+// =============================================================================
+
+describe("duplicate validation (property)", () => {
+  // Feature: pulumi-user-management, Property 6: No duplicate names within sections
+  // Validates: Requirements 6.6, 6.7, 6.8, 6.9
+
+  it("rejects duplicate account names (property)", () => {
+    fc.assert(
+      fc.property(validName, (name) => {
+        const config: UsersConfig = {
+          aws_accounts: [{ name }, { name }],
+          github_teams: [{ name: "team" }],
+          iam_groups: [{ name: "group", account: name }],
+          users: [
+            {
+              name: "user",
+              github_team: "team",
+              iam_assignments: [{ account: name, iam_group: "group" }],
+            },
+          ],
+        };
+        expect(() => validateConfig(config)).toThrow(
+          /[Dd]uplicate AWS account/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects duplicate team names (property)", () => {
+    fc.assert(
+      fc.property(validName, (name) => {
+        const config: UsersConfig = {
+          aws_accounts: [{ name: "dev" }],
+          github_teams: [{ name }, { name }],
+          iam_groups: [{ name: "group", account: "dev" }],
+          users: [
+            {
+              name: "user",
+              github_team: name,
+              iam_assignments: [{ account: "dev", iam_group: "group" }],
+            },
+          ],
+        };
+        expect(() => validateConfig(config)).toThrow(
+          /[Dd]uplicate GitHub team/,
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects duplicate iam_group name+account pairs (property)", () => {
+    fc.assert(
+      fc.property(validName, (name) => {
+        const config: UsersConfig = {
+          aws_accounts: [{ name: "dev" }],
+          github_teams: [{ name: "team" }],
+          iam_groups: [
+            { name, account: "dev" },
+            { name, account: "dev" },
+          ],
+          users: [
+            {
+              name: "user",
+              github_team: "team",
+              iam_assignments: [{ account: "dev", iam_group: name }],
+            },
+          ],
+        };
+        expect(() => validateConfig(config)).toThrow(/[Dd]uplicate IAM group/);
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("accepts same group name in different accounts (property)", () => {
+    fc.assert(
+      fc.property(validName, validName, validName, (grpName, acct1, acct2) => {
+        fc.pre(acct1 !== acct2);
+        const config: UsersConfig = {
+          aws_accounts: [{ name: acct1 }, { name: acct2 }],
+          github_teams: [{ name: "team" }],
+          iam_groups: [
+            { name: grpName, account: acct1 },
+            { name: grpName, account: acct2 },
+          ],
+          users: [
+            {
+              name: "user",
+              github_team: "team",
+              iam_assignments: [{ account: acct1, iam_group: grpName }],
+            },
+          ],
+        };
+        expect(() => validateConfig(config)).not.toThrow();
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("rejects duplicate user names (property)", () => {
+    fc.assert(
+      fc.property(validName, (name) => {
+        const config: UsersConfig = {
+          aws_accounts: [{ name: "dev" }],
+          github_teams: [{ name: "team" }],
+          iam_groups: [{ name: "group", account: "dev" }],
+          users: [
+            {
+              name,
+              github_team: "team",
+              iam_assignments: [{ account: "dev", iam_group: "group" }],
+            },
+            {
+              name,
+              github_team: "team",
+              iam_assignments: [{ account: "dev", iam_group: "group" }],
+            },
+          ],
+        };
+        expect(() => validateConfig(config)).toThrow(/[Dd]uplicate user name/);
+      }),
+      { numRuns: 100 },
+    );
   });
 });
