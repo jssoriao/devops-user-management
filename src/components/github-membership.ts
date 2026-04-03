@@ -4,7 +4,8 @@ import * as github from "@pulumi/github";
 export interface GitHubMembershipComponentArgs {
   username: string;
   teamSlug: string;
-  role?: string;
+  orgRole?: string;
+  teamRole?: string;
 }
 
 export class GitHubMembershipComponent extends pulumi.ComponentResource {
@@ -18,13 +19,14 @@ export class GitHubMembershipComponent extends pulumi.ComponentResource {
   ) {
     super("devops-user-management:GitHubMembershipComponent", name, {}, opts);
 
-    const role = args.role ?? "member";
+    const orgRole = args.orgRole ?? "member";
+    const teamRole = args.teamRole ?? "member";
 
     this.membership = new github.Membership(
       `${args.username}-membership`,
       {
         username: args.username,
-        role: role,
+        role: orgRole,
       },
       { parent: this },
     );
@@ -34,7 +36,7 @@ export class GitHubMembershipComponent extends pulumi.ComponentResource {
       {
         teamId: args.teamSlug,
         username: args.username,
-        role: role,
+        role: teamRole,
       },
       { parent: this },
     );

@@ -33,11 +33,11 @@ beforeAll(() => {
   );
 });
 
-// Feature: devops-user-management, Property 6: Default membership role
+// Feature: devops-user-management, Property 7: Default membership role
 // Validates: Requirements 3.3
 
 describe("GitHubMembershipComponent", () => {
-  it("defaults membership role to 'member' when no role is specified (property)", async () => {
+  it("defaults both roles to 'member' when no roles are specified (property)", async () => {
     const { GitHubMembershipComponent } =
       await import("../src/components/github-membership");
 
@@ -50,7 +50,6 @@ describe("GitHubMembershipComponent", () => {
           teamSlug,
         });
 
-        // Await outputs to ensure child resources are registered
         await new Promise<void>((resolve) =>
           pulumi
             .all([comp.membership.urn, comp.teamMembership.urn])
@@ -76,16 +75,17 @@ describe("GitHubMembershipComponent", () => {
     );
   });
 
-  it("uses the provided role when explicitly specified", async () => {
+  it("uses provided orgRole and teamRole when explicitly specified", async () => {
     const { GitHubMembershipComponent } =
       await import("../src/components/github-membership");
 
     const startIdx = createdResources.length;
 
-    const comp = new GitHubMembershipComponent("test-admin-github", {
-      username: "admin",
+    const comp = new GitHubMembershipComponent("test-roles-github", {
+      username: "lead",
       teamSlug: "platform",
-      role: "maintainer",
+      orgRole: "admin",
+      teamRole: "maintainer",
     });
 
     await new Promise<void>((resolve) =>
@@ -104,7 +104,7 @@ describe("GitHubMembershipComponent", () => {
     );
 
     expect(membership).toBeDefined();
-    expect(membership!.inputs.role).toBe("maintainer");
+    expect(membership!.inputs.role).toBe("admin");
 
     expect(teamMembership).toBeDefined();
     expect(teamMembership!.inputs.role).toBe("maintainer");

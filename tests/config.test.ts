@@ -27,7 +27,7 @@ function makeMinimalConfig(overrides?: Partial<UsersConfig>): UsersConfig {
     users: [
       {
         name: "alice",
-        github_team: "backend",
+        github: { team: "backend" },
         iam_assignments: [{ account: "dev", iam_group: "developers" }],
       },
     ],
@@ -54,8 +54,8 @@ describe("loadConfig", () => {
           expect(loaded.users.length).toBe(config.users.length);
           for (let i = 0; i < config.users.length; i++) {
             expect(loaded.users[i].name).toBe(config.users[i].name);
-            expect(loaded.users[i].github_team).toBe(
-              config.users[i].github_team,
+            expect(loaded.users[i].github.team).toBe(
+              config.users[i].github.team,
             );
             expect(loaded.users[i].iam_assignments).toEqual(
               config.users[i].iam_assignments,
@@ -177,7 +177,7 @@ describe("validateConfig", () => {
           users: [
             {
               name: undefined as any,
-              github_team: team,
+              github: { team: team },
               iam_assignments: [{ account: "dev", iam_group: group }],
             },
           ],
@@ -190,7 +190,7 @@ describe("validateConfig", () => {
     );
   });
 
-  it("rejects user with missing github_team (property)", () => {
+  it("rejects user with missing github (property)", () => {
     fc.assert(
       fc.property(validName, validName, (name, group) => {
         const config = makeMinimalConfig({
@@ -198,13 +198,13 @@ describe("validateConfig", () => {
           users: [
             {
               name,
-              github_team: undefined as any,
+              github: undefined as any,
               iam_assignments: [{ account: "dev", iam_group: group }],
             },
           ],
         });
         expect(() => validateConfig(config)).toThrow(
-          /missing required field "github_team"/,
+          /missing required field "github"/,
         );
       }),
       { numRuns: 100 },
@@ -218,7 +218,7 @@ describe("validateConfig", () => {
           users: [
             {
               name,
-              github_team: "backend",
+              github: { team: "backend" },
               iam_assignments: undefined as any,
             },
           ],
@@ -231,7 +231,7 @@ describe("validateConfig", () => {
 
   it("rejects user with empty iam_assignments array", () => {
     const config = makeMinimalConfig({
-      users: [{ name: "alice", github_team: "backend", iam_assignments: [] }],
+      users: [{ name: "alice", github: { team: "backend" }, iam_assignments: [] }],
     });
     expect(() => validateConfig(config)).toThrow(/iam_assignments/);
   });
@@ -241,7 +241,7 @@ describe("validateConfig", () => {
       users: [
         {
           name: "alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [
             { account: undefined as any, iam_group: "developers" },
           ],
@@ -258,7 +258,7 @@ describe("validateConfig", () => {
       users: [
         {
           name: "alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: undefined as any }],
         },
       ],
@@ -318,7 +318,7 @@ describe("validateConfig", () => {
           users: [
             {
               name,
-              github_team: "backend",
+              github: { team: "backend" },
               iam_assignments: [{ account: "dev", iam_group: "developers" }],
             },
           ],
@@ -335,7 +335,7 @@ describe("validateConfig", () => {
       users: [
         {
           name: "-alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: "developers" }],
         },
       ],
@@ -348,7 +348,7 @@ describe("validateConfig", () => {
       users: [
         {
           name: "alice-",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: "developers" }],
         },
       ],
@@ -361,7 +361,7 @@ describe("validateConfig", () => {
       users: [
         {
           name: "Alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: "developers" }],
         },
       ],
@@ -374,7 +374,7 @@ describe("validateConfig", () => {
       users: [
         {
           name: "alice!",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: "developers" }],
         },
       ],
@@ -388,12 +388,12 @@ describe("validateConfig", () => {
       users: [
         {
           name: "alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: "developers" }],
         },
         {
           name: "alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "dev", iam_group: "developers" }],
         },
       ],
@@ -445,7 +445,7 @@ describe("cross-reference validation", () => {
   // Feature: pulumi-user-management, Property 5: Cross-reference validation rejects unresolved references
   // Validates: Requirements 6.1, 6.2, 6.3, 6.4
 
-  it("rejects user referencing non-existent github_team (property)", () => {
+  it("rejects user referencing non-existent github team (property)", () => {
     fc.assert(
       fc.property(validName, validName, (userName, badTeam) => {
         fc.pre(badTeam !== "backend"); // ensure it doesn't accidentally match
@@ -453,7 +453,7 @@ describe("cross-reference validation", () => {
           users: [
             {
               name: userName,
-              github_team: badTeam,
+              github: { team: badTeam },
               iam_assignments: [{ account: "dev", iam_group: "developers" }],
             },
           ],
@@ -474,7 +474,7 @@ describe("cross-reference validation", () => {
           users: [
             {
               name: userName,
-              github_team: "backend",
+              github: { team: "backend" },
               iam_assignments: [
                 { account: badAccount, iam_group: "developers" },
               ],
@@ -497,7 +497,7 @@ describe("cross-reference validation", () => {
           users: [
             {
               name: userName,
-              github_team: "backend",
+              github: { team: "backend" },
               iam_assignments: [{ account: "dev", iam_group: badGroup }],
             },
           ],
@@ -532,7 +532,7 @@ describe("cross-reference validation", () => {
       users: [
         {
           name: "alice",
-          github_team: "backend",
+          github: { team: "backend" },
           iam_assignments: [{ account: "prod", iam_group: "developers" }],
         },
       ],
@@ -561,7 +561,7 @@ describe("duplicate validation (property)", () => {
           users: [
             {
               name: "user",
-              github_team: "team",
+              github: { team: "team" },
               iam_assignments: [{ account: name, iam_group: "group" }],
             },
           ],
@@ -584,7 +584,7 @@ describe("duplicate validation (property)", () => {
           users: [
             {
               name: "user",
-              github_team: name,
+              github: { team: name },
               iam_assignments: [{ account: "dev", iam_group: "group" }],
             },
           ],
@@ -610,7 +610,7 @@ describe("duplicate validation (property)", () => {
           users: [
             {
               name: "user",
-              github_team: "team",
+              github: { team: "team" },
               iam_assignments: [{ account: "dev", iam_group: name }],
             },
           ],
@@ -635,7 +635,7 @@ describe("duplicate validation (property)", () => {
           users: [
             {
               name: "user",
-              github_team: "team",
+              github: { team: "team" },
               iam_assignments: [{ account: acct1, iam_group: grpName }],
             },
           ],
@@ -656,12 +656,12 @@ describe("duplicate validation (property)", () => {
           users: [
             {
               name,
-              github_team: "team",
+              github: { team: "team" },
               iam_assignments: [{ account: "dev", iam_group: "group" }],
             },
             {
               name,
-              github_team: "team",
+              github: { team: "team" },
               iam_assignments: [{ account: "dev", iam_group: "group" }],
             },
           ],

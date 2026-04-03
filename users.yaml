@@ -25,15 +25,19 @@ iam_groups:
     policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
 
 users:
-  - name: alice
-    github_team: backend
+  - name: exztinct01
+    github:
+      team: backend
+      role: admin
+      team_role: maintainer
     iam_assignments:
       - account: dev
         iam_group: backend-developers
       - account: prod
         iam_group: backend-developers
-  - name: bob
-    github_team: frontend
+  - name: jaezsoriao
+    github:
+      team: frontend
     iam_assignments:
       - account: dev
         iam_group: frontend-developers

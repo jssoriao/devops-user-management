@@ -107,7 +107,7 @@ export const validUsersConfig: fc.Arbitrary<UsersConfig> = fc
     // Each user gets the first team and one assignment to the first account/group
     const users: UserEntry[] = userNames.map((name) => ({
       name,
-      github_team: teamNames[0],
+      github: { team: teamNames[0] },
       iam_assignments: [{ account: accountNames[0], iam_group: groupNames[0] }],
     }));
 

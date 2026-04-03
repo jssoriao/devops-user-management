@@ -33,9 +33,15 @@ export interface IAMAssignment {
   iam_group: string;
 }
 
+export interface GitHubUserConfig {
+  team: string;
+  role?: "member" | "admin";
+  team_role?: "member" | "maintainer";
+}
+
 export interface UserEntry {
   name: string;
-  github_team: string;
+  github: GitHubUserConfig;
   iam_assignments: IAMAssignment[];
 }
 
@@ -232,9 +238,14 @@ export function validateConfig(config: UsersConfig): void {
     if (!user.name || typeof user.name !== "string") {
       throw new Error(`User at index ${i} is missing required field "name"`);
     }
-    if (!user.github_team || typeof user.github_team !== "string") {
+    if (!user.github || typeof user.github !== "object") {
       throw new Error(
-        `User at index ${i} is missing required field "github_team"`,
+        `User at index ${i} is missing required field "github" (expected an object with "team")`,
+      );
+    }
+    if (!user.github.team || typeof user.github.team !== "string") {
+      throw new Error(
+        `User at index ${i} is missing required field "github.team"`,
       );
     }
     if (
@@ -250,9 +261,27 @@ export function validateConfig(config: UsersConfig): void {
         `User at index ${i} has invalid name "${user.name}". Names must match pattern: ${NAME_PATTERN}`,
       );
     }
-    if (!teamNames.has(user.github_team)) {
+    if (
+      user.github.role !== undefined &&
+      user.github.role !== "member" &&
+      user.github.role !== "admin"
+    ) {
       throw new Error(
-        `User "${user.name}" references non-existent GitHub team "${user.github_team}"`,
+        `User "${user.name}" has invalid github.role "${user.github.role}". Allowed values: "member", "admin"`,
+      );
+    }
+    if (
+      user.github.team_role !== undefined &&
+      user.github.team_role !== "member" &&
+      user.github.team_role !== "maintainer"
+    ) {
+      throw new Error(
+        `User "${user.name}" has invalid github.team_role "${user.github.team_role}". Allowed values: "member", "maintainer"`,
+      );
+    }
+    if (!teamNames.has(user.github.team)) {
+      throw new Error(
+        `User "${user.name}" references non-existent GitHub team "${user.github.team}"`,
       );
     }
     if (userNames.has(user.name)) {
