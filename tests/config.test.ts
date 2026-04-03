@@ -211,6 +211,64 @@ describe("validateConfig", () => {
     );
   });
 
+  it("rejects user with missing github.team", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github: {} as any,
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /missing required field "github\.team"/,
+    );
+  });
+
+  it("rejects user with invalid github.role", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github: { team: "backend", role: "owner" as any },
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /invalid github\.role.*Allowed values: "member", "admin"/,
+    );
+  });
+
+  it("rejects user with invalid github.team_role", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github: { team: "backend", team_role: "owner" as any },
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(
+      /invalid github\.team_role.*Allowed values: "member", "maintainer"/,
+    );
+  });
+
+  it("accepts valid github.role and github.team_role values", () => {
+    const config = makeMinimalConfig({
+      users: [
+        {
+          name: "alice",
+          github: { team: "backend", role: "admin", team_role: "maintainer" },
+          iam_assignments: [{ account: "dev", iam_group: "developers" }],
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
   it("rejects user with missing iam_assignments (property)", () => {
     fc.assert(
       fc.property(validName, (name) => {
