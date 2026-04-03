@@ -145,9 +145,15 @@ interface IAMAssignment {
   iam_group: string; // references an iam_groups entry for that account
 }
 
+interface GitHubUserConfig {
+  team: string;
+  role?: "member" | "admin";
+  team_role?: "member" | "maintainer";
+}
+
 interface UserEntry {
   name: string;
-  github_team: string;
+  github: GitHubUserConfig;
   iam_assignments: IAMAssignment[];
 }
 
@@ -168,7 +174,9 @@ function validateConfig(config: UsersConfig): void; // throws on invalid
   - Each `aws_accounts` entry has a `name`.
   - Each `github_teams` entry has at minimum a `name`.
   - Each `iam_groups` entry has a `name` and a required `account` referencing a defined AWS account.
-  - Each user has `name`, `github_team`, and `iam_assignments` (non-empty array).
+  - Each user has `name`, `github` (object with required `team`), and `iam_assignments` (non-empty array).
+  - Each `github.role` if specified must be `"member"` or `"admin"`.
+  - Each `github.team_role` if specified must be `"member"` or `"maintainer"`.
   - Each `iam_assignments` entry has `account` and `iam_group`.
   - All names match `/^[a-z0-9]+(-[a-z0-9]+)*$/` (lowercase alphanumeric with hyphens).
   - No duplicate names within `aws_accounts`.
@@ -178,7 +186,7 @@ function validateConfig(config: UsersConfig): void; // throws on invalid
   - If `privacy` is specified on a team, it must be `"closed"` or `"secret"`.
   - **Cross-reference validation**:
     - Every `iam_groups` entry's `account` must match a `name` in `aws_accounts`.
-    - Every user's `github_team` must match a `name` in `github_teams`.
+    - Every user's `github.team` must match a `name` in `github_teams`.
     - Every user's `iam_assignments[].account` must match a `name` in `aws_accounts`.
     - Every user's `iam_assignments[].iam_group` must match an IAM group defined for that specific account in `iam_groups`.
 
@@ -223,7 +231,8 @@ Creates a single `github.Team` resource with all supported properties. The resou
 interface GitHubMembershipComponentArgs {
   username: string;
   teamSlug: string;
-  role?: string; // defaults to "member"
+  orgRole?: string;   // defaults to "member", allowed: "member" | "admin"
+  teamRole?: string;  // defaults to "member", allowed: "member" | "maintainer"
 }
 
 class GitHubMembershipComponent extends pulumi.ComponentResource {
@@ -237,7 +246,7 @@ class GitHubMembershipComponent extends pulumi.ComponentResource {
 }
 ```
 
-Creates `github.Membership` (org-level) and `github.TeamMembership` (team-level). Role defaults to `"member"`. Unchanged from current implementation.
+Creates `github.Membership` (org-level, role defaults to `"member"`) and `github.TeamMembership` (team-level, role defaults to `"member"`). Both roles are configurable via the user's `github` config object.
 
 ### AWSUserComponent (`src/components/aws-user.ts`)
 
@@ -330,7 +339,7 @@ for (const user of usersConfig.users) {
   // GitHub membership (once per user)
   new GitHubMembershipComponent(
     resourceName(stackName, user.name, "github"),
-    { username: user.name, teamSlug: user.github_team },
+    { username: user.name, teamSlug: user.github.team, orgRole: user.github.role, teamRole: user.github.team_role },
     { dependsOn: [teams[user.github_team]] },
   );
 
@@ -391,14 +400,18 @@ iam_groups:
 
 users:
   - name: alice
-    github_team: backend
+    github:
+      team: backend
+      role: admin
+      team_role: maintainer
     iam_assignments:
       - account: dev-account
         iam_group: backend-developers
       - account: prod-account
         iam_group: backend-developers
   - name: bob
-    github_team: frontend
+    github:
+      team: frontend
     iam_assignments:
       - account: dev-account
         iam_group: frontend-developers
@@ -413,7 +426,10 @@ users:
 **User Entry Constraints:**
 
 - `name`: required, must match `/^[a-z0-9]+(-[a-z0-9]+)*$/`
-- `github_team`: required, must match same pattern, must reference a name in `github_teams`
+- `github`: required object with:
+  - `team`: required, must match same pattern, must reference a name in `github_teams`
+  - `role`: optional, must be `"member"` or `"admin"` (defaults to `"member"`)
+  - `team_role`: optional, must be `"member"` or `"maintainer"` (defaults to `"member"`)
 - `iam_assignments`: required, non-empty array of `{ account, iam_group }` objects
 - Each `iam_assignments[].account` must reference a name in `aws_accounts`
 - Each `iam_assignments[].iam_group` must reference an IAM group defined for that specific account in `iam_groups`
@@ -516,9 +532,9 @@ _For any_ config containing duplicate `name` values within `aws_accounts`, dupli
 
 ### Property 7: Default membership role
 
-_For any_ GitHub membership created without an explicit role override, the membership role should be `"member"`.
+_For any_ GitHub membership created without explicit role overrides, the organization membership role should be `"member"` and the team membership role should be `"member"`.
 
-**Validates: Requirements 3.3**
+**Validates: Requirements 3.3, 3.4**
 
 ### Property 8: Team membership links to correct team
 
@@ -559,7 +575,7 @@ _For any_ IAM resource (group, user, policy attachment) scoped to a given accoun
 | `users.yaml` file not found                                                     | Throw `Error` with message indicating file path                           | Before resource creation |
 | Invalid YAML syntax                                                              | Throw `Error` with YAML parse error details                               | Before resource creation |
 | Missing required section (`aws_accounts`, `github_teams`, `iam_groups`, `users`) | Throw `Error` listing the missing section                                 | Before resource creation |
-| Missing required field on user (`name`, `github_team`, `iam_assignments`)        | Throw `Error` listing the missing field and user index                    | Before resource creation |
+| Missing required field on user (`name`, `github`, `github.team`, `iam_assignments`)  | Throw `Error` listing the missing field and user index                    | Before resource creation |
 | Missing required field on iam_assignment (`account`, `iam_group`)                | Throw `Error` listing the missing field, user index, and assignment index | Before resource creation |
 | Missing required field on aws_account (`name`)                                   | Throw `Error` listing the missing field and entry index                   | Before resource creation |
 | Missing required field on team/group (`name`, `account` for groups)              | Throw `Error` listing the missing field and entry index                   | Before resource creation |
@@ -569,7 +585,7 @@ _For any_ IAM resource (group, user, policy attachment) scoped to a given accoun
 | Duplicate team `name` in `github_teams`                                          | Throw `Error` listing the duplicate name                                  | Before resource creation |
 | Duplicate `name`+`account` pair in `iam_groups`                                  | Throw `Error` listing the duplicate name and account                      | Before resource creation |
 | Duplicate user `name` in `users`                                                 | Throw `Error` listing the duplicate name                                  | Before resource creation |
-| User references non-existent `github_team`                                       | Throw `Error` identifying the user and unresolved team reference          | Before resource creation |
+| User references non-existent `github.team`                                       | Throw `Error` identifying the user and unresolved team reference          | Before resource creation |
 | User iam_assignment references non-existent `account`                            | Throw `Error` identifying the user, assignment, and unresolved account    | Before resource creation |
 | User iam_assignment references `iam_group` not defined for that account          | Throw `Error` identifying the user, account, and unresolved group         | Before resource creation |
 | `iam_groups` entry references non-existent `account`                             | Throw `Error` identifying the group and unresolved account reference      | Before resource creation |

@@ -34,7 +34,7 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 4. THE `aws_accounts` section SHALL NOT contain any credentials, role ARNs, account IDs, or region information
 5. THE `github_teams` section SHALL define each team with at minimum a `name` property
 6. THE `iam_groups` section SHALL define each IAM group with at minimum a `name` property and a required `account` property referencing a defined AWS_Account
-7. THE `users` section SHALL define each user with a `name`, a `github_team` reference, and an `iam_assignments` list
+7. THE `users` section SHALL define each user with a `name`, a `github` object (containing required `team`, optional `role`, and optional `team_role`), and an `iam_assignments` list
 8. THE `iam_assignments` list on each user SHALL contain entries with an `account` property and an `iam_group` property
 9. IF the User_Config file is missing or contains invalid YAML, THEN THE Pulumi_Project SHALL fail with a descriptive error message before creating any resources
 10. WHEN a user entry is added to the User_Config, THE Pulumi_Project SHALL create a GitHub membership and an AWS IAM user in each account referenced by the user's IAM_Assignments
@@ -64,10 +64,13 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 #### Acceptance Criteria
 
 1. WHEN a user entry exists in the User_Config, THE GitHub_Membership_Component SHALL add the user to the GitHub organization
-2. WHEN a user entry specifies a `github_team`, THE GitHub_Membership_Component SHALL assign the user to the corresponding GitHub team defined in the `github_teams` section
-3. THE GitHub_Membership_Component SHALL set the membership role to `member` by default
-4. THE GitHub_Membership_Component SHALL be implemented as a Pulumi Component Resource
-5. THE GitHub_Membership_Component SHALL derive the GitHub username from the user name using the Naming_Convention
+2. WHEN a user entry specifies a `github.team`, THE GitHub_Membership_Component SHALL assign the user to the corresponding GitHub team defined in the `github_teams` section
+3. THE GitHub_Membership_Component SHALL set the organization membership role to `member` by default, configurable via the optional `github.role` property (allowed values: `member`, `admin`)
+4. THE GitHub_Membership_Component SHALL set the team membership role to `member` by default, configurable via the optional `github.team_role` property (allowed values: `member`, `maintainer`)
+5. THE Config_Validator SHALL reject `github.role` values other than `member` or `admin` with a descriptive error
+6. THE Config_Validator SHALL reject `github.team_role` values other than `member` or `maintainer` with a descriptive error
+7. THE GitHub_Membership_Component SHALL be implemented as a Pulumi Component Resource
+8. THE GitHub_Membership_Component SHALL derive the GitHub username from the user name using the Naming_Convention
 
 ### Requirement 4: AWS IAM User Management (Multi-Account)
 
