@@ -8,7 +8,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest --run --reporter verbose",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "pnpm format:check && pnpm lint && pnpm test"
   },
   "dependencies": {
     "@pulumi/aws": "^6.0.0",
