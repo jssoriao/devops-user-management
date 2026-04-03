@@ -231,7 +231,9 @@ describe("validateConfig", () => {
 
   it("rejects user with empty iam_assignments array", () => {
     const config = makeMinimalConfig({
-      users: [{ name: "alice", github: { team: "backend" }, iam_assignments: [] }],
+      users: [
+        { name: "alice", github: { team: "backend" }, iam_assignments: [] },
+      ],
     });
     expect(() => validateConfig(config)).toThrow(/iam_assignments/);
   });
