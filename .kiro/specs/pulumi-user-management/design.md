@@ -17,7 +17,7 @@ The project uses Pulumi Component Resources for encapsulation, supports multi-en
 2. **One AWS provider per account via role assumption** — `index.ts` creates an `aws.Provider` per `aws_accounts` entry by reading the role ARN and region from Pulumi stack config. All IAM resources for that account receive `{ provider: accountProviders[accountName] }`.
 3. **IAM groups scoped to account** — Uniqueness is the `name`+`account` pair. The same group name can exist in different accounts.
 4. **Per-user multi-account IAM assignments** — Users have an `iam_assignments` list instead of a single `iam_group`. Each assignment specifies an `account` and `iam_group`, creating one IAM user per assignment in the correct account.
-5. **Component Resources over raw resources** — Each logical grouping (GitHub team, GitHub membership, AWS user) is a Pulumi `ComponentResource`, enabling reuse and clean resource tree organization. `AWSUserComponent` now accepts a `provider` option to deploy to the correct account.
+5. **Component Resources over raw resources** — Each logical grouping (GitHub team, GitHub membership, AWS user) is a Pulumi `ComponentResource`, enabling reuse and clean resource tree organization. A top-level `UserComponent` composes `GitHubMembershipComponent` and one `AWSUserComponent` per IAM assignment, grouping all resources for a user under a single parent. `AWSUserComponent` accepts a `provider` option to deploy to the correct account.
 6. **Cross-reference validation before resource creation** — The config is parsed and validated (schema, naming convention, cross-references between sections including account references on groups and user assignments) before any Pulumi resources are registered.
 7. **Stack-name prefixing for namespace isolation** — Every resource name is prefixed with the Pulumi stack name, so dev/staging/prod never collide.
 8. **Least-privilege IAM by default** — IAM groups default to `ReadOnlyAccess` if no policy is specified, and support multiple policies, permission boundaries, and IAM paths for fine-grained access control.
@@ -32,8 +32,9 @@ graph TD
     B --> P[Account Provider Creation Loop]
     P -->|one aws.Provider per account| PA[Account Providers Map]
     B --> D[GitHubTeamComponent]
-    B --> E[GitHubMembershipComponent]
-    B --> F[AWSUserComponent per assignment]
+    B --> U[UserComponent per user]
+    U --> E[GitHubMembershipComponent]
+    U --> F[AWSUserComponent per assignment]
     B --> G[IAM Group Creation per account]
     D -->|github.Team with full properties| H[GitHub Provider]
     E -->|github.Membership + github.TeamMembership| H
@@ -46,6 +47,7 @@ graph TD
         P
         PA
         D
+        U
         E
         F
         G
@@ -93,7 +95,8 @@ sequenceDiagram
 │   └── components/
 │       ├── github-team.ts       # GitHubTeamComponent (full github.Team properties)
 │       ├── github-membership.ts # GitHubMembershipComponent
-│       └── aws-user.ts          # AWSUserComponent (accepts provider option)
+│       ├── aws-user.ts          # AWSUserComponent (accepts provider option)
+│       └── user.ts              # UserComponent (composes GitHubMembership + AWSUser)
 ├── tests/
 │   ├── arbitraries.ts           # Shared test arbitraries (fast-check generators)
 │   ├── config.test.ts           # Config loading + validation tests
@@ -269,6 +272,51 @@ class AWSUserComponent extends pulumi.ComponentResource {
 
 Creates an `aws.iam.User` and an `aws.iam.UserGroupMembership`. The caller passes the correct account's `aws.Provider` via `opts.provider` (or `opts.providers`) so all child resources deploy to the right account. Policy management is handled at the IAM group level from the `iam_groups` config section.
 
+### UserComponent (`src/components/user.ts`)
+
+```typescript
+interface IAMAssignmentArgs {
+  account: string;
+  groupName: string;
+  provider: aws.Provider;
+}
+
+interface UserComponentArgs {
+  username: string;
+  github: {
+    teamSlug: string;
+    orgRole?: string;
+    teamRole?: string;
+  };
+  iamAssignments: IAMAssignmentArgs[];
+}
+
+class UserComponent extends pulumi.ComponentResource {
+  public readonly githubMembership: GitHubMembershipComponent;
+  public readonly awsUsers: AWSUserComponent[];
+  constructor(
+    name: string,
+    args: UserComponentArgs,
+    opts?: pulumi.ComponentResourceOptions,
+  );
+}
+```
+
+Composes `GitHubMembershipComponent` and `AWSUserComponent` under a single parent resource per user. Creates one `GitHubMembershipComponent` as a child (with `{ parent: this }`), then iterates `iamAssignments` to create one `AWSUserComponent` per entry (with `{ parent: this, provider: assignment.provider }`). This groups all resources for a user under a single node in the Pulumi resource tree:
+
+```
+UserComponent (dev-alice)
+├── GitHubMembershipComponent (alice-github)
+│   ├── github.Membership
+│   └── github.TeamMembership
+├── AWSUserComponent (alice-dev-account-aws)
+│   ├── aws.iam.User              [provider: dev-account]
+│   └── aws.iam.UserGroupMembership [provider: dev-account]
+└── AWSUserComponent (alice-prod-account-aws)
+    ├── aws.iam.User              [provider: prod-account]
+    └── aws.iam.UserGroupMembership [provider: prod-account]
+```
+
 ### Entry Point (`index.ts`)
 
 ```typescript
@@ -334,29 +382,30 @@ for (const groupDef of usersConfig.iam_groups) {
   groups[`${groupDef.account}/${groupDef.name}`] = g;
 }
 
-// 4. Create per-user resources
+// 4. Create per-user resources using UserComponent
 for (const user of usersConfig.users) {
-  // GitHub membership (once per user)
-  new GitHubMembershipComponent(
-    resourceName(stackName, user.name, "github"),
-    { username: user.name, teamSlug: user.github.team, orgRole: user.github.role, teamRole: user.github.team_role },
-    { dependsOn: [teams[user.github_team]] },
-  );
-
-  // One IAM user per iam_assignment
-  for (const assignment of user.iam_assignments) {
-    const provider = accountProviders[assignment.account];
-    const groupKey = `${assignment.account}/${assignment.iam_group}`;
-
-    new AWSUserComponent(
-      resourceName(stackName, user.name, assignment.account, "aws"),
-      {
-        username: resourceName(stackName, user.name),
-        groupName: resourceName(stackName, assignment.iam_group),
+  new UserComponent(
+    resourceName(stackName, user.name),
+    {
+      username: user.name,
+      github: {
+        teamSlug: user.github.team,
+        orgRole: user.github.role,
+        teamRole: user.github.team_role,
       },
-      { provider, dependsOn: [groups[groupKey]] },
-    );
-  }
+      iamAssignments: user.iam_assignments.map((a) => ({
+        account: a.account,
+        groupName: resourceName(stackName, a.iam_group),
+        provider: accountProviders[a.account],
+      })),
+    },
+    {
+      dependsOn: [
+        teams[user.github.team],
+        ...user.iam_assignments.map((a) => groups[`${a.account}/${a.iam_group}`]),
+      ],
+    },
+  );
 }
 ```
 
@@ -484,6 +533,7 @@ AWS credentials for the initial bootstrap (the identity that assumes the per-acc
 | ----------------- | ----------------------------------------------- | -------------------------------------------- |
 | AWS Provider      | `{stack}-{account}-provider`                    | `dev-dev-account-provider`                   |
 | GitHub Team       | `{teamSlug}`                                    | `backend`                                    |
+| User              | `{stack}-{username}`                            | `dev-alice`                                  |
 | GitHub Membership | `{username}-github`                             | `alice-github`                               |
 | IAM User          | `{stack}-{username}-{account}-aws`              | `dev-alice-dev-account-aws`                  |
 | IAM Group         | `{stack}-{account}-{group}`                     | `dev-dev-account-backend-developers`         |
@@ -502,7 +552,7 @@ _For any_ valid `UsersConfig` object (with valid `aws_accounts`, `github_teams`,
 
 ### Property 2: Resource count matches configuration
 
-_For any_ valid `UsersConfig` with A entries in `aws_accounts`, M entries in `github_teams`, K entries in `iam_groups`, N user entries, and T total `iam_assignments` across all users, the Pulumi program should register exactly A AWS providers, M GitHub team components, N GitHub membership components, T AWS user components (one per assignment), and K IAM groups.
+_For any_ valid `UsersConfig` with A entries in `aws_accounts`, M entries in `github_teams`, K entries in `iam_groups`, N user entries, and T total `iam_assignments` across all users, the Pulumi program should register exactly A AWS providers, M GitHub team components, N user components (each containing one GitHub membership component and one AWS user component per assignment), T AWS user components (one per assignment), and K IAM groups.
 
 **Validates: Requirements 1.10, 2.1, 3.1, 4.5, 5.1, 10.1**
 

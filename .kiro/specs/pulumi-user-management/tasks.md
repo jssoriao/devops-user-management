@@ -84,15 +84,15 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - **Property 3: Naming convention output format**
     - **Validates: Requirements 7.1, 7.2, 2.2, 3.5, 4.2**
 
-- [ ] 4. Checkpoint - Validate config and naming modules
+- [x] 4. Checkpoint - Validate config and naming modules
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 5. Create CI workflow for tests
   - [x] 5.1 `.github/workflows/ci.yml` — already complete, no changes needed
     - _Requirements: 11.1_
 
-- [ ] 6. Update GitHubTeamComponent for full property support
-  - [ ] 6.1 Update `src/components/github-team.ts` with all `github.Team` properties
+- [x] 6. Update GitHubTeamComponent for full property support
+  - [x] 6.1 Update `src/components/github-team.ts` with all `github.Team` properties
     - Extend `GitHubTeamComponentArgs` with: `privacy?`, `parentTeamId?`, `parentTeamReadId?`, `parentTeamReadSlug?`, `notificationSetting?`, `ldapDn?`, `createDefaultMaintainer?`
     - Pass all optional properties through to the `github.Team` resource constructor only when defined
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.10_
@@ -103,22 +103,31 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Also test `IAMGroupEntry` optional properties (`path`, `permission_boundary`) passthrough
     - **Validates: Requirements 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 5.5, 5.6**
 
-- [ ] 7. Verify GitHubMembershipComponent tests
-  - [ ] 7.1 Verify `src/components/github-membership.ts` — no code changes needed
+- [x] 7. Verify GitHubMembershipComponent tests
+  - [x] 7.1 Verify `src/components/github-membership.ts` — no code changes needed
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ]* 7.2 Verify property test for default membership role still passes
+  - [x] 7.2 Verify property test for default membership role still passes
     - **Property 7: Default membership role**
     - Verify existing `tests/github-membership.test.ts` property test still passes with no changes
     - **Validates: Requirements 3.3**
 
-- [ ] 8. Update AWSUserComponent for multi-account provider support
-  - [ ] 8.1 Update `src/components/aws-user.ts`
+- [-] 8. Update AWSUserComponent for multi-account provider support
+  - [x] 8.1 Update `src/components/aws-user.ts`
     - Remove `policyArn?` from `AWSUserComponentArgs` — policy management is at the IAM group level
     - Keep `username` and `groupName` fields
     - Keep `aws.iam.User` and `aws.iam.UserGroupMembership` creation
     - The caller passes the correct account's `aws.Provider` via `opts.provider` for account targeting — no changes needed in the component itself beyond removing `policyArn`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+  - [ ] 8.5 Create `UserComponent` wrapper in `src/components/user.ts`
+    - Create `IAMAssignmentArgs` interface with `account: string`, `groupName: string`, `provider: aws.Provider`
+    - Create `UserComponentArgs` interface with `username: string`, `github: { teamSlug, orgRole?, teamRole? }`, `iamAssignments: IAMAssignmentArgs[]`
+    - Implement `UserComponent` extending `pulumi.ComponentResource` with type `devops-user-management:UserComponent`
+    - Create one `GitHubMembershipComponent` as a child (`{ parent: this }`) using `args.github` properties
+    - Loop `args.iamAssignments` to create one `AWSUserComponent` per entry with `{ parent: this, provider: assignment.provider }`
+    - Expose `githubMembership: GitHubMembershipComponent` and `awsUsers: AWSUserComponent[]` as public readonly fields
+    - _Requirements: 4.1, 4.5, 3.1, 3.2_
 
 - [ ] 9. Update main entry point for multi-account orchestration
   - [ ] 9.1 Update `index.ts` for multi-account provider creation and four-section config
@@ -130,7 +139,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Resolve policies per group: `policy_arns` > `policy_arn` > default `ReadOnlyAccess`; create `GroupPolicyAttachment` for each resolved ARN with correct provider
     - Apply `path` and `permission_boundary` on groups when specified
     - Store groups keyed by `"accountName/groupName"` for lookup
-    - Per-user loop: create one `GitHubMembershipComponent` per user, then one `AWSUserComponent` per `iam_assignments` entry with `{ provider: accountProviders[assignment.account] }`
+    - Per-user loop: create one `UserComponent` per user, passing `github` config (teamSlug, orgRole, teamRole) and `iamAssignments` array (each with account, groupName, and the account's provider from `accountProviders`)
     - Remove old derived-teams/derived-groups logic and `pulumi.Config` based custom policy lookup
     - _Requirements: 1.1, 1.2, 1.10, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 4.1, 4.3, 4.5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 7.1, 10.1, 10.2, 10.3, 10.4_
 
@@ -140,7 +149,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 - [ ] 11. Implement integration tests with Pulumi mocks
   - [ ] 11.1 Create `tests/index.test.ts` with Pulumi mock setup and unit tests
     - Set up `pulumi.runtime.setMocks()` to mock resource creation and track created resources
-    - Test: two accounts, two users with multi-account iam_assignments → correct resource counts (2 providers, 2 teams, 2 memberships, correct number of IAM users per assignment, correct number of IAM groups per account)
+    - Test: two accounts, two users with multi-account iam_assignments → correct resource counts (2 providers, 2 teams, 2 user components each containing 1 membership + correct number of IAM users per assignment, correct number of IAM groups per account)
     - Test: invalid config entry → validation error
     - Test: all resource names conform to naming convention pattern
     - Test: component resources are instances of `ComponentResource`
@@ -158,7 +167,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 
   - [ ]* 11.2 Write property test for resource count matches configuration (Property 2)
     - **Property 2: Resource count matches configuration**
-    - Use Pulumi mocks and fast-check to generate random valid four-section configs and verify exactly A providers, M teams, N memberships, T IAM users (one per iam_assignment), K IAM groups are registered
+    - Use Pulumi mocks and fast-check to generate random valid four-section configs and verify exactly A providers, M teams, N user components (each with 1 membership), T IAM users (one per iam_assignment), K IAM groups are registered
     - **Validates: Requirements 1.10, 2.1, 3.1, 4.5, 5.1, 10.1**
 
   - [ ]* 11.3 Write property test for team membership links to correct team (Property 8)
@@ -219,8 +228,8 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 - Task 2 (config) needs significant rework: new `AWSAccountEntry` and `IAMAssignment` interfaces, four-section validation, `iam_groups` scoped to accounts with required `account` field, users with `iam_assignments` replacing `iam_group`, cross-reference validation across accounts, name+account uniqueness for groups
 - Task 6 (GitHub team component) needs expansion: all `github.Team` optional properties
 - Task 7 (GitHub membership) needs test verification only — code is unchanged
-- Task 8 (AWS user component) needs simplification: remove `policyArn`, provider passed via `opts` for account targeting
-- Task 9 (entry point) needs full restructuring: per-account provider creation loop, account-scoped IAM groups, per-assignment IAM user creation
+- Task 8 (AWS user component) needs simplification: remove `policyArn`, provider passed via `opts` for account targeting. New `UserComponent` wraps `GitHubMembershipComponent` + `AWSUserComponent` per user.
+- Task 9 (entry point) needs full restructuring: per-account provider creation loop, account-scoped IAM groups, per-user `UserComponent` creation
 - Task 11 (integration tests) covers 12 correctness properties (P1–P12) including new P12 for account provider correctness
 - Property tests validate all 12 correctness properties from the design document
 - Unit tests validate specific examples and edge cases using Pulumi mocks
