@@ -10,6 +10,8 @@ When writing TypeScript files, group and order imports as follows:
 2. Blank line separator
 3. Relative imports (starting with `./` or `../`) — ordered by line length (longest first)
 
+This ordering is also enforced by `prettier-plugin-sort-imports` configured in `.prettierrc`. When possible, run `pnpm format` after editing to ensure consistent formatting.
+
 Example:
 
 ```typescript
