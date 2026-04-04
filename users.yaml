@@ -35,7 +35,7 @@ users:
         iam_group: backend-developers
       - account: prod
         iam_group: backend-developers
-  - name: jaezsoriao
+  - name: jssoriao19
     github:
       team: frontend
     iam_assignments:

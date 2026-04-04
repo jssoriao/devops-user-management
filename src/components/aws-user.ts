@@ -4,7 +4,6 @@ import * as aws from "@pulumi/aws";
 export interface AWSUserComponentArgs {
   username: string;
   groupName: string;
-  policyArn?: string;
 }
 
 export class AWSUserComponent extends pulumi.ComponentResource {
@@ -19,7 +18,7 @@ export class AWSUserComponent extends pulumi.ComponentResource {
     super("devops-user-management:AWSUserComponent", name, {}, opts);
 
     this.user = new aws.iam.User(
-      `${args.username}`,
+      `${name}-user`,
       {
         name: args.username,
       },
@@ -27,7 +26,7 @@ export class AWSUserComponent extends pulumi.ComponentResource {
     );
 
     this.groupMembership = new aws.iam.UserGroupMembership(
-      `${args.username}-group-membership`,
+      `${name}-group-membership`,
       {
         user: this.user.name,
         groups: [args.groupName],

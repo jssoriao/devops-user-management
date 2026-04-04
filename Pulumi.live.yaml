@@ -1,3 +1,5 @@
+environment:
+  - user-mgmt/live
 config:
   github:owner: obscurus-dev
   github:token:
