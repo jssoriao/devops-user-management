@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 
-import { resourceName, NAME_PATTERN } from "../src/naming";
+import { NAME_PATTERN, resourceName } from "../src/naming";
 import { validName } from "./arbitraries";
 
 describe("naming convention", () => {

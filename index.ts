@@ -2,8 +2,8 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 
 import { GitHubTeamComponent } from "./src/components/github-team";
-import { UserComponent } from "./src/components/user";
 import { loadConfig, validateConfig } from "./src/config";
+import { UserComponent } from "./src/components/user";
 import { resourceName } from "./src/naming";
 
 const config = new pulumi.Config();

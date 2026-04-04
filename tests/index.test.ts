@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as pulumi from "@pulumi/pulumi";
 
-import { validateConfig, UsersConfig } from "../src/config";
+import { UsersConfig, validateConfig } from "../src/config";
 import { NAME_PATTERN, resourceName } from "../src/naming";
 
 // Track created resources for assertions

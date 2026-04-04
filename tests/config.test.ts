@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { dump as yamlDump } from "js-yaml";
 import * as fc from "fast-check";
 import * as path from "path";
-import * as fs from "fs";
 import * as os from "os";
+import * as fs from "fs";
 
-import { loadConfig, validateConfig, UsersConfig } from "../src/config";
-import { validName, validUsersConfig, invalidName } from "./arbitraries";
+import { invalidName, validName, validUsersConfig } from "./arbitraries";
+import { loadConfig, UsersConfig, validateConfig } from "../src/config";
 
 // -- Helpers --
 

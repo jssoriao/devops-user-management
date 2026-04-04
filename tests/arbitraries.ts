@@ -3,8 +3,8 @@ import * as fc from "fast-check";
 import type {
   AWSAccountEntry,
   GitHubTeamEntry,
-  IAMGroupEntry,
   IAMAssignment,
+  IAMGroupEntry,
   UserEntry,
   UsersConfig,
 } from "../src/config";
