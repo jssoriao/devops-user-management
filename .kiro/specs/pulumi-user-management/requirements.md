@@ -2,14 +2,14 @@
 
 ## Introduction
 
-This feature implements a Pulumi infrastructure-as-code project that manages GitHub organization membership and AWS IAM users across multiple AWS accounts from a structured YAML configuration file. The configuration has four root-level sections: `aws_accounts` (account name definitions), `github_teams` (explicit team definitions with full GitHub Team properties), `iam_groups` (explicit IAM group definitions scoped to specific accounts with policy configuration), and `users` (user assignments with multi-account IAM assignments). Account names are defined in YAML but all sensitive credentials (role ARNs, regions) are stored in Pulumi stack config as secrets — no account IDs or credentials appear in source control. The system creates a separate AWS provider per account using role assumption, deploys IAM resources to the correct account in a single `pulumi up`, creates GitHub teams with all supported properties, assigns users to those teams, and validates cross-references between sections. The project uses TypeScript, Pulumi Component Resources, supports multiple environments, and includes CI pipeline configuration and unit tests.
+This feature implements a Pulumi infrastructure-as-code project that manages GitHub organization membership and AWS IAM users across multiple AWS accounts from a structured YAML configuration file. The configuration has four root-level sections: `aws_accounts` (account name definitions), `github_teams` (explicit team definitions with full GitHub Team properties), `iam_groups` (explicit IAM group definitions scoped to specific accounts with policy configuration), and `users` (user assignments with multi-account IAM assignments). Account names are defined in YAML but all sensitive credentials (role ARNs, regions) are managed by Pulumi ESC environments using OIDC-based authentication — no account IDs, credentials, or long-lived secrets appear in source control or stack configuration files. The system creates a separate AWS provider per account using role assumption, deploys IAM resources to the correct account in a single `pulumi up`, creates GitHub teams with all supported properties, assigns users to those teams, and validates cross-references between sections. The project uses TypeScript, Pulumi Component Resources, supports multiple environments, and includes CI pipeline configuration and unit tests.
 
 ## Glossary
 
 - **Pulumi_Project**: The Pulumi TypeScript project that defines and deploys all infrastructure resources
 - **User_Config**: A YAML configuration file with four root-level sections (`aws_accounts`, `github_teams`, `iam_groups`, `users`) that defines all accounts, teams, IAM group definitions, and user assignments
-- **AWS_Account**: A named AWS account entry in the `aws_accounts` section; only the logical name is stored in YAML, while the role ARN and region are stored in Pulumi stack config as secrets
-- **Account_Provider**: A Pulumi AWS provider instance created per AWS_Account using role assumption credentials from Pulumi stack config
+- **AWS_Account**: A named AWS account entry in the `aws_accounts` section; only the logical name is stored in YAML, while the role ARN and region are injected at runtime by Pulumi ESC via OIDC
+- **Account_Provider**: A Pulumi AWS provider instance created per AWS_Account using role assumption credentials injected by Pulumi ESC
 - **GitHub_Provider**: The Pulumi GitHub provider used to manage GitHub organization resources
 - **GitHub_Team_Component**: A Pulumi Component Resource that encapsulates creation of a GitHub team with all supported `github.Team` properties (name, description, privacy, parent team, notification setting, LDAP DN, create default maintainer)
 - **GitHub_Membership_Component**: A Pulumi Component Resource that encapsulates adding a user to a GitHub organization and assigning the user to a GitHub team
@@ -17,7 +17,7 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 - **IAM_Group**: An AWS IAM group scoped to a specific AWS_Account, with configurable policy ARNs, IAM path, and optional permission boundary
 - **IAM_Assignment**: A mapping on a user entry that assigns the user to a specific IAM_Group in a specific AWS_Account
 - **Naming_Convention**: A deterministic rule for deriving resource names from user and team/group identifiers
-- **Stack_Config**: Pulumi stack configuration that selects the target environment (dev, staging, prod) and stores per-account role ARNs as Pulumi secrets
+- **Stack_Config**: Pulumi stack configuration that selects the target environment (dev, staging, prod), references a Pulumi ESC environment for credentials, and stores the stack name used for resource namespacing
 - **Config_Validator**: The module responsible for validating the User_Config structure, field values, and cross-references between sections
 
 ## Requirements
@@ -125,27 +125,27 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 2. THE Naming_Convention SHALL produce lowercase alphanumeric names with hyphens as separators
 3. IF a name in the User_Config contains characters outside the allowed set, THEN THE Pulumi_Project SHALL fail with a descriptive validation error before creating any resources
 
-### Requirement 8: Multi-Environment Support
+### Requirement 8: Single Stack Deployment
 
-**User Story:** As a DevOps engineer, I want to deploy the same configuration to different environments, so that I can manage dev, staging, and production separately.
+**User Story:** As a DevOps engineer, I want a single `live` stack that deploys GitHub resources and all AWS account resources in one `pulumi up`, so that user management is atomic and simple.
 
 #### Acceptance Criteria
 
-1. THE Pulumi_Project SHALL support separate Pulumi stacks for dev, staging, and prod environments
-2. WHEN a stack is selected, THE Pulumi_Project SHALL use the stack name to namespace all created resources
-3. THE Pulumi_Project SHALL allow each stack to reference its own User_Config file or a shared one with environment overrides
+1. THE Pulumi_Project SHALL use a single `live` Pulumi stack to deploy all resources (GitHub teams, memberships, and IAM users/groups across all AWS accounts)
+2. THE Pulumi_Project SHALL use the stack name (`live`) to namespace all created resources
+3. THE Pulumi_Project SHALL read the User_Config file path from the stack configuration
 
 ### Requirement 9: Secret Management (Multi-Account)
 
-**User Story:** As a DevOps engineer, I want all sensitive credentials stored securely outside of YAML configuration, so that secrets are not exposed in source control or logs.
+**User Story:** As a DevOps engineer, I want all sensitive credentials managed through Pulumi ESC with OIDC-based authentication, so that no long-lived secrets exist in source control, CI secrets, or stack configuration files.
 
 #### Acceptance Criteria
 
-1. THE Pulumi_Project SHALL store the GitHub provider token as a Pulumi secret
-2. THE Pulumi_Project SHALL store per-account AWS role ARNs as Pulumi secrets in the stack configuration
-3. THE Pulumi_Project SHALL retrieve per-account region configuration from the Pulumi stack configuration
+1. THE Pulumi_Project SHALL use Pulumi ESC environments to manage the GitHub provider token
+2. THE Pulumi_Project SHALL use Pulumi ESC environments with OIDC-based `fn::open::aws-login` to obtain short-lived AWS credentials for each account
+3. THE Pulumi_Project SHALL retrieve per-account role ARNs and region configuration from Pulumi config values injected by ESC at runtime
 4. THE User_Config YAML file SHALL NOT contain any AWS account IDs, role ARNs, access keys, or region information
-5. THE Pulumi_Project SHALL support AWS credentials via environment variables or role assumption for the initial provider bootstrap
+5. THE Pulumi stack configuration files SHALL NOT contain any long-lived secrets — all credentials SHALL be resolved dynamically by ESC via OIDC
 6. THE Pulumi_Project SHALL ensure no secret values appear in plaintext in Pulumi state or stack outputs
 
 ### Requirement 10: Multi-Account AWS Provider Management
@@ -155,10 +155,10 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 #### Acceptance Criteria
 
 1. WHEN the Pulumi_Project deploys, THE Pulumi_Project SHALL create one Account_Provider per entry in the `aws_accounts` section
-2. THE Account_Provider SHALL assume the IAM role specified by the role ARN stored in the Pulumi stack configuration for that account name
-3. THE Account_Provider SHALL use the region specified in the Pulumi stack configuration for that account name
+2. THE Account_Provider SHALL assume the IAM role specified by the role ARN injected into Pulumi config by the ESC environment for that account name
+3. THE Account_Provider SHALL use the region injected into Pulumi config by the ESC environment for that account name
 4. THE Pulumi_Project SHALL pass the correct Account_Provider to all IAM resources (groups, users, policy attachments) scoped to that account
-5. IF the role ARN for an account is missing from the Pulumi stack configuration, THEN THE Pulumi_Project SHALL fail with a descriptive error identifying the account with the missing configuration
+5. IF the role ARN for an account is missing from the Pulumi configuration (ESC not injecting), THEN THE Pulumi_Project SHALL fail with a descriptive error identifying the account with the missing configuration
 6. THE Pulumi_Project SHALL deploy IAM resources for all configured accounts in a single `pulumi up` execution
 
 ### Requirement 11: CI Pipeline
@@ -170,7 +170,7 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 1. THE Pulumi_Project SHALL include a CI pipeline configuration file (e.g., GitHub Actions workflow)
 2. WHEN a pull request is opened or updated targeting the main branch, THE CI pipeline SHALL run `pulumi preview` and post the results to the pull request
 3. WHEN a pull request is merged into the main branch, THE CI pipeline SHALL run `pulumi up` to apply the changes
-4. THE CI pipeline SHALL retrieve secrets from the CI environment secret store rather than from the repository
+4. THE CI pipeline SHALL only require `PULUMI_ACCESS_TOKEN` as a CI secret — all AWS and GitHub credentials SHALL be resolved dynamically by Pulumi ESC via OIDC
 5. IF `pulumi preview` detects no changes, THEN THE CI pipeline SHALL report no changes on the pull request
 6. THE CI pipeline SHALL NOT allow direct pushes to the main branch to trigger `pulumi up` without a preceding pull request
 
@@ -196,6 +196,6 @@ This feature implements a Pulumi infrastructure-as-code project that manages Git
 2. THE README SHALL document how to install dependencies and run the Pulumi project
 3. THE README SHALL document how to add or remove users by editing the User_Config
 4. THE README SHALL document the four-section YAML configuration structure (`aws_accounts`, `github_teams`, `iam_groups`, `users`) with all supported properties
-5. THE README SHALL document the multi-account deployment model, including how account names in YAML map to role ARNs in Pulumi stack config
+5. THE README SHALL document the multi-account deployment model, including how account names in YAML map to Pulumi ESC environments with OIDC-based credential resolution
 6. THE README SHALL document all assumptions made in the implementation
-7. THE README SHALL document how to configure secrets for GitHub and AWS providers, including per-account role ARN secrets in stack config
+7. THE README SHALL document how to set up Pulumi ESC environments for AWS OIDC authentication and GitHub token management, including IAM trust policy configuration

@@ -112,7 +112,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Verify existing `tests/github-membership.test.ts` property test still passes with no changes
     - **Validates: Requirements 3.3**
 
-- [-] 8. Update AWSUserComponent for multi-account provider support
+- [x] 8. Update AWSUserComponent for multi-account provider support
   - [x] 8.1 Update `src/components/aws-user.ts`
     - Remove `policyArn?` from `AWSUserComponentArgs` — policy management is at the IAM group level
     - Keep `username` and `groupName` fields
@@ -120,7 +120,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - The caller passes the correct account's `aws.Provider` via `opts.provider` for account targeting — no changes needed in the component itself beyond removing `policyArn`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [ ] 8.5 Create `UserComponent` wrapper in `src/components/user.ts`
+  - [x] 8.5 Create `UserComponent` wrapper in `src/components/user.ts`
     - Create `IAMAssignmentArgs` interface with `account: string`, `groupName: string`, `provider: aws.Provider`
     - Create `UserComponentArgs` interface with `username: string`, `github: { teamSlug, orgRole?, teamRole? }`, `iamAssignments: IAMAssignmentArgs[]`
     - Implement `UserComponent` extending `pulumi.ComponentResource` with type `devops-user-management:UserComponent`
@@ -129,8 +129,8 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Expose `githubMembership: GitHubMembershipComponent` and `awsUsers: AWSUserComponent[]` as public readonly fields
     - _Requirements: 4.1, 4.5, 3.1, 3.2_
 
-- [ ] 9. Update main entry point for multi-account orchestration
-  - [ ] 9.1 Update `index.ts` for multi-account provider creation and four-section config
+- [x] 9. Update main entry point for multi-account orchestration
+  - [x] 9.1 Update `index.ts` for multi-account provider creation and four-section config
     - Read per-account role ARN (`pulumiConfig.requireSecret(\`aws:${acct.name}:roleArn\`)`) and region (`pulumiConfig.require(\`aws:${acct.name}:region\`)`) from Pulumi stack config
     - Create one `aws.Provider` per `aws_accounts` entry using `assumeRole` with the role ARN and region
     - Store providers in `accountProviders: Record<string, aws.Provider>`
@@ -143,11 +143,11 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Remove old derived-teams/derived-groups logic and `pulumi.Config` based custom policy lookup
     - _Requirements: 1.1, 1.2, 1.10, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 4.1, 4.3, 4.5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 7.1, 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 10. Checkpoint - Validate all components and orchestration
+- [x] 10. Checkpoint - Validate all components and orchestration
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Implement integration tests with Pulumi mocks
-  - [ ] 11.1 Create `tests/index.test.ts` with Pulumi mock setup and unit tests
+- [-] 11. Implement integration tests with Pulumi mocks
+  - [x] 11.1 Create `tests/index.test.ts` with Pulumi mock setup and unit tests
     - Set up `pulumi.runtime.setMocks()` to mock resource creation and track created resources
     - Test: two accounts, two users with multi-account iam_assignments → correct resource counts (2 providers, 2 teams, 2 user components each containing 1 membership + correct number of IAM users per assignment, correct number of IAM groups per account)
     - Test: invalid config entry → validation error
@@ -193,18 +193,25 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 - [ ] 12. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Create Pulumi stack configuration files
-  - [ ] 13.1 Create `Pulumi.dev.yaml`, `Pulumi.staging.yaml`, and `Pulumi.prod.yaml`
-    - Each stack config references `usersFile` (path to `users.yaml` or environment-specific override)
-    - Include placeholder for `github:token` as a Pulumi secret
-    - Include per-account `aws:{accountName}:roleArn` as Pulumi secrets and `aws:{accountName}:region` values
-    - _Requirements: 8.1, 8.2, 8.3, 9.1, 9.2, 9.3, 9.4_
+- [ ] 13. Create Pulumi stack configuration and ESC environments
+  - [ ] 13.1 Update `Pulumi.live.yaml` to reference ESC environment
+    - Add `environment: [user-mgmt/live]` to reference the composed ESC environment
+    - Include `usersFile` config pointing to `users.yaml`
+    - No secrets stored in stack YAML — all credentials managed by ESC
+    - _Requirements: 8.1, 8.2, 8.3, 9.1, 9.2, 9.3, 9.5_
+
+  - [ ] 13.2 Document Pulumi ESC environment setup
+    - Document per-account ESC environments with `fn::open::aws-login` OIDC configuration
+    - Document composed `user-mgmt/live` ESC environment that imports account environments and GitHub token
+    - Document AWS IAM OIDC identity provider setup for Pulumi Cloud
+    - Document IAM role trust policies for each target account
+    - _Requirements: 9.1, 9.2, 9.3, 9.5_
 
 - [ ] 14. Create deploy pipeline configuration
   - [ ] 14.1 Create `.github/workflows/deploy.yml` GitHub Actions workflow
-    - On `pull_request` targeting `main`: run `pulumi preview`, post results to PR
-    - On `push` to `main` (only via merged PR): run `pulumi up --yes`
-    - Retrieve `PULUMI_ACCESS_TOKEN`, `GITHUB_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` from GitHub Actions secrets
+    - On `pull_request` targeting `main`: run `pulumi preview --stack live`, post results to PR
+    - On `push` to `main` (only via merged PR): run `pulumi up --stack live --yes`
+    - Retrieve `PULUMI_ACCESS_TOKEN` from GitHub Actions secrets (ESC handles AWS and GitHub credentials via OIDC)
     - Report "no changes" when preview detects no diff
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
@@ -213,10 +220,9 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Document how to install dependencies (`pnpm install`) and run the Pulumi project (`pulumi up`)
     - Document how to add/remove users by editing `users.yaml`
     - Document the four-section YAML configuration structure (`aws_accounts`, `github_teams`, `iam_groups`, `users`) with all supported properties for each section
-    - Document the multi-account deployment model: account names in YAML map to role ARNs in Pulumi stack config, one provider per account via role assumption
+    - Document the multi-account deployment model: single `live` stack deploys to all AWS accounts, account names in YAML map to ESC environments with OIDC-based credential resolution
     - Document all assumptions made in the implementation (naming convention, default policies, org membership model)
-    - Document how to configure secrets for GitHub and AWS providers (Pulumi config secrets for per-account role ARNs, CI environment variables)
-    - Document multi-environment usage with Pulumi stacks
+    - Document how to configure secrets using Pulumi ESC: per-account OIDC environments, composed stack environments, GitHub token management, and AWS IAM trust policy setup
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
 
 - [ ] 16. Final checkpoint - Ensure all tests pass

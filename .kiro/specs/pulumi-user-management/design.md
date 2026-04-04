@@ -5,21 +5,21 @@
 This design describes a Pulumi TypeScript project that manages GitHub organization membership and AWS IAM users across multiple AWS accounts from a single YAML configuration file with four root-level sections: `aws_accounts`, `github_teams`, `iam_groups`, and `users`. The system reads `users.yaml`, validates it (including cross-reference checks between sections and across accounts), and declaratively provisions:
 
 - GitHub teams with full property support (description, privacy, parent team, notification settings, LDAP DN, create default maintainer) and user-to-team memberships
-- Per-account AWS providers using role assumption from Pulumi stack config secrets
+- Per-account AWS providers using `envVarMappings` with credentials managed by Pulumi ESC (OIDC-based, no long-lived keys)
 - AWS IAM users deployed to the correct account based on per-user `iam_assignments`
 - Account-scoped IAM groups with least-privilege policy attachments (multiple policies, permission boundaries, IAM paths)
 
-The project uses Pulumi Component Resources for encapsulation, supports multi-environment deployment via Pulumi stacks (dev/staging/prod), stores secrets through Pulumi's built-in secret management, and ships with a GitHub Actions CI pipeline and unit tests using Pulumi mocks.
+The project uses Pulumi Component Resources for encapsulation, uses a single `live` stack that deploys to all accounts in one `pulumi up`, manages secrets and credentials through Pulumi ESC with OIDC-based authentication, and ships with a GitHub Actions CI pipeline and unit tests using Pulumi mocks.
 
 ### Key Design Decisions
 
-1. **Four-section YAML config as source of truth** — AWS accounts, GitHub teams, IAM groups, and users are defined in separate sections of `users.yaml`. Account names are the only data in YAML; role ARNs and regions live in Pulumi stack config as secrets. No credentials in source control.
-2. **One AWS provider per account via role assumption** — `index.ts` creates an `aws.Provider` per `aws_accounts` entry by reading the role ARN and region from Pulumi stack config. All IAM resources for that account receive `{ provider: accountProviders[accountName] }`.
+1. **Four-section YAML config as source of truth** — AWS accounts, GitHub teams, IAM groups, and users are defined in separate sections of `users.yaml`. Account names are the only data in YAML; role ARNs and regions are managed by Pulumi ESC environments using OIDC. No credentials in source control.
+2. **One AWS provider per account via envVarMappings** — `index.ts` creates an `aws.Provider` per `aws_accounts` entry. ESC injects per-account credentials as prefixed environment variables (e.g., `DEV_AWS_ACCESS_KEY_ID`), and each provider uses `envVarMappings` to remap them to the standard `AWS_ACCESS_KEY_ID` etc. No `assumeRole` needed in code.
 3. **IAM groups scoped to account** — Uniqueness is the `name`+`account` pair. The same group name can exist in different accounts.
 4. **Per-user multi-account IAM assignments** — Users have an `iam_assignments` list instead of a single `iam_group`. Each assignment specifies an `account` and `iam_group`, creating one IAM user per assignment in the correct account.
 5. **Component Resources over raw resources** — Each logical grouping (GitHub team, GitHub membership, AWS user) is a Pulumi `ComponentResource`, enabling reuse and clean resource tree organization. A top-level `UserComponent` composes `GitHubMembershipComponent` and one `AWSUserComponent` per IAM assignment, grouping all resources for a user under a single parent. `AWSUserComponent` accepts a `provider` option to deploy to the correct account.
 6. **Cross-reference validation before resource creation** — The config is parsed and validated (schema, naming convention, cross-references between sections including account references on groups and user assignments) before any Pulumi resources are registered.
-7. **Stack-name prefixing for namespace isolation** — Every resource name is prefixed with the Pulumi stack name, so dev/staging/prod never collide.
+7. **Stack-name prefixing for consistent resource naming** — Every resource name is prefixed with the Pulumi stack name (`live`) for consistent, predictable resource identification.
 8. **Least-privilege IAM by default** — IAM groups default to `ReadOnlyAccess` if no policy is specified, and support multiple policies, permission boundaries, and IAM paths for fine-grained access control.
 
 ## Architecture
@@ -60,16 +60,23 @@ graph TD
 sequenceDiagram
     participant Dev as Developer
     participant GHA as GitHub Actions
+    participant ESC as Pulumi ESC
     participant Pulumi as Pulumi CLI
     participant GH as GitHub API
     participant AWS1 as AWS Account 1
     participant AWS2 as AWS Account N
 
     Dev->>GHA: Open/update PR targeting main
+    GHA->>ESC: Resolve ESC environment (OIDC)
+    ESC->>AWS1: STS AssumeRoleWithWebIdentity
+    ESC->>AWS2: STS AssumeRoleWithWebIdentity
+    ESC->>GHA: Short-lived credentials injected
     GHA->>Pulumi: pulumi preview
     Pulumi->>GHA: Change summary
     GHA->>GHA: Post preview results to PR
     Dev->>GHA: Merge PR into main
+    GHA->>ESC: Resolve ESC environment (OIDC)
+    ESC->>GHA: Short-lived credentials injected
     GHA->>Pulumi: pulumi up --yes
     Pulumi->>GH: Create/update teams & memberships
     Pulumi->>AWS1: Create/update IAM users, groups, policies (account 1)
@@ -84,9 +91,7 @@ sequenceDiagram
 ```
 .
 ├── Pulumi.yaml                  # Pulumi project definition
-├── Pulumi.dev.yaml              # Dev stack config (secrets incl. per-account role ARNs)
-├── Pulumi.staging.yaml          # Staging stack config
-├── Pulumi.prod.yaml             # Prod stack config
+├── Pulumi.live.yaml             # Live stack config (references ESC environment)
 ├── users.yaml                   # User configuration file (4 sections)
 ├── index.ts                     # Entry point
 ├── src/
@@ -328,16 +333,20 @@ const stackName = pulumi.getStack();
 const pulumiConfig = new pulumi.Config();
 const DEFAULT_POLICY_ARN = "arn:aws:iam::aws:policy/ReadOnlyAccess";
 
-// 1. Create one AWS provider per account using role assumption from stack config
+// 1. Create one AWS provider per account using envVarMappings (credentials injected by ESC)
 const accountProviders: Record<string, aws.Provider> = {};
 for (const acct of usersConfig.aws_accounts) {
-  const roleArn = pulumiConfig.requireSecret(`aws:${acct.name}:roleArn`);
-  const region = pulumiConfig.require(`aws:${acct.name}:region`);
+  const region = pulumiConfig.require(`aws-${acct.name}-region`);
+  const prefix = acct.name.toUpperCase().replace(/-/g, "_");
   accountProviders[acct.name] = new aws.Provider(
     resourceName(stackName, acct.name, "provider"),
+    { region },
     {
-      assumeRole: { roleArn },
-      region,
+      envVarMappings: {
+        [`${prefix}_AWS_ACCESS_KEY_ID`]: "AWS_ACCESS_KEY_ID",
+        [`${prefix}_AWS_SECRET_ACCESS_KEY`]: "AWS_SECRET_ACCESS_KEY",
+        [`${prefix}_AWS_SESSION_TOKEN`]: "AWS_SESSION_TOKEN",
+      },
     },
   );
 }
@@ -470,7 +479,7 @@ users:
 
 - `name`: required, must match `/^[a-z0-9]+(-[a-z0-9]+)*$/`
 - No duplicate `name` values within `aws_accounts`
-- Role ARN and region are stored in Pulumi stack config, not in YAML
+- Role ARN and region are managed by Pulumi ESC environments, not stored in YAML or stack config files
 
 **User Entry Constraints:**
 
@@ -508,36 +517,87 @@ users:
 - If neither `policy_arn` nor `policy_arns` is specified, defaults to `arn:aws:iam::aws:policy/ReadOnlyAccess`
 - No duplicate `name`+`account` pairs within `iam_groups`
 
-### Pulumi Stack Configuration
+### Pulumi ESC Environments
 
-Each stack file (`Pulumi.{env}.yaml`) contains per-account role ARNs and regions as secrets:
+Credentials and per-account configuration are managed by Pulumi ESC using OIDC-based authentication. No long-lived AWS keys or role ARNs are stored in stack YAML files or CI secrets.
+
+**Per-account ESC environments** — Each AWS account has its own ESC environment that uses `fn::open::aws-login` with OIDC to obtain short-lived credentials:
 
 ```yaml
-config:
-  devops-user-management:usersFile: users.yaml
-  devops-user-management:aws:dev-account:roleArn:
-    secure: <encrypted-role-arn>
-  devops-user-management:aws:dev-account:region: us-east-1
-  devops-user-management:aws:prod-account:roleArn:
-    secure: <encrypted-role-arn>
-  devops-user-management:aws:prod-account:region: us-west-2
-  github:token:
-    secure: <encrypted-token>
+# ESC: user-mgmt/aws-dev-account
+values:
+  aws-dev:
+    login:
+      fn::open::aws-login:
+        oidc:
+          roleArn: arn:aws:iam::111111111111:role/pulumi-user-mgmt-deploy
+          sessionName: pulumi-user-mgmt
+          duration: 1h
+    region: us-east-1
 ```
 
-AWS credentials for the initial bootstrap (the identity that assumes the per-account roles) are provided via environment variables or the CI secret store, never stored in stack config files.
+**Composed stack ESC environment** — A single `user-mgmt/live` environment imports all account environments and the GitHub token:
+
+```yaml
+# ESC: user-mgmt/live
+imports:
+  - user-mgmt/aws-dev-account
+  - user-mgmt/aws-prod-account
+  - user-mgmt/github
+
+values:
+  pulumiConfig:
+    devops-user-management:aws-dev-region: ${aws-dev.region}
+    devops-user-management:aws-prod-region: ${aws-prod.region}
+  environmentVariables:
+    GITHUB_TOKEN: ${github.token}
+    DEV_AWS_ACCESS_KEY_ID: ${aws-dev.login.accessKeyId}
+    DEV_AWS_SECRET_ACCESS_KEY: ${aws-dev.login.secretAccessKey}
+    DEV_AWS_SESSION_TOKEN: ${aws-dev.login.sessionToken}
+    PROD_AWS_ACCESS_KEY_ID: ${aws-prod.login.accessKeyId}
+    PROD_AWS_SECRET_ACCESS_KEY: ${aws-prod.login.secretAccessKey}
+    PROD_AWS_SESSION_TOKEN: ${aws-prod.login.sessionToken}
+```
+
+**Stack config** — The single `live` stack references its ESC environment. No secrets are stored in the YAML:
+
+```yaml
+# Pulumi.live.yaml
+environment:
+  - user-mgmt/live
+config:
+  devops-user-management:usersFile: users.yaml
+```
+
+**Authentication flow:**
+
+```
+Pulumi CLI → ESC environment → OIDC → AWS STS (per account) → short-lived credentials
+                             → OIDC → GitHub token (if using ESC for GitHub)
+```
+
+Each `pulumi up` or `pulumi preview` fetches fresh short-lived credentials via ESC. No static keys exist anywhere — not in stack config, not in CI secrets, not in environment variables.
+
+**ESC environment structure:**
+
+| ESC Environment                | Purpose                                      |
+| ------------------------------ | -------------------------------------------- |
+| `user-mgmt/aws-dev-account`   | OIDC login for dev AWS account               |
+| `user-mgmt/aws-prod-account`  | OIDC login for prod AWS account              |
+| `user-mgmt/github`            | GitHub token (stored as ESC secret)          |
+| `user-mgmt/live`              | Composed env for live stack (imports above)  |
 
 ### Resource Naming Model
 
-| Resource Type     | Name Pattern                                    | Example (stack=dev)                          |
-| ----------------- | ----------------------------------------------- | -------------------------------------------- |
-| AWS Provider      | `{stack}-{account}-provider`                    | `dev-dev-account-provider`                   |
-| GitHub Team       | `{teamSlug}`                                    | `backend`                                    |
-| User              | `{stack}-{username}`                            | `dev-alice`                                  |
-| GitHub Membership | `{username}-github`                             | `alice-github`                               |
-| IAM User          | `{stack}-{username}-{account}-aws`              | `dev-alice-dev-account-aws`                  |
-| IAM Group         | `{stack}-{account}-{group}`                     | `dev-dev-account-backend-developers`         |
-| IAM Group Policy  | `{stack}-{account}-{group}-policy-{idx}`        | `dev-dev-account-backend-developers-policy-0`|
+| Resource Type     | Name Pattern                                    | Example (stack=live)                          |
+| ----------------- | ----------------------------------------------- | --------------------------------------------- |
+| AWS Provider      | `{stack}-{account}-provider`                    | `live-dev-account-provider`                   |
+| GitHub Team       | `{teamSlug}`                                    | `backend`                                     |
+| User              | `{stack}-{username}`                            | `live-alice`                                  |
+| GitHub Membership | `{username}-github`                             | `alice-github`                                |
+| IAM User          | `{stack}-{username}-{account}-aws`              | `live-alice-dev-account-aws`                  |
+| IAM Group         | `{stack}-{account}-{group}`                     | `live-dev-account-backend-developers`         |
+| IAM Group Policy  | `{stack}-{account}-{group}-policy-{idx}`        | `live-dev-account-backend-developers-policy-0`|
 
 
 ## Correctness Properties
@@ -612,7 +672,7 @@ _For any_ `GitHubTeamEntry` with optional properties (`description`, `privacy`, 
 
 ### Property 12: Account provider correctness
 
-_For any_ IAM resource (group, user, policy attachment) scoped to a given account, the resource should be created using the `aws.Provider` instance for that account, which is configured with the role ARN and region from the Pulumi stack configuration for that account name.
+_For any_ IAM resource (group, user, policy attachment) scoped to a given account, the resource should be created using the `aws.Provider` instance for that account, which is configured with the role ARN and region from the Pulumi configuration (injected by ESC at runtime) for that account name.
 
 **Validates: Requirements 4.1, 10.2, 10.3, 10.4**
 
@@ -644,8 +704,9 @@ _For any_ IAM resource (group, user, policy attachment) scoped to a given accoun
 
 | Error Condition                                                    | Behavior                                                        |
 | ------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Role ARN missing from Pulumi stack config for an account           | Pulumi `requireSecret` throws with descriptive error at startup |
-| Region missing from Pulumi stack config for an account             | Pulumi `require` throws with descriptive error at startup       |
+| Role ARN missing from Pulumi config (ESC not injecting)            | Pulumi `requireSecret` throws with descriptive error at startup |
+| Region missing from Pulumi config (ESC not injecting)              | Pulumi `require` throws with descriptive error at startup       |
+| ESC OIDC token exchange failure                                    | ESC reports authentication error before Pulumi runs             |
 | GitHub API authentication failure                                  | Pulumi reports provider error; CI pipeline fails                |
 | AWS role assumption failure (invalid ARN, insufficient permissions) | Pulumi reports provider error for that account; CI pipeline fails |
 | GitHub user does not exist in org                                  | `github.Membership` resource creation fails with provider error |
@@ -655,7 +716,7 @@ _For any_ IAM resource (group, user, policy attachment) scoped to a given accoun
 
 - If `pulumi preview` fails on a PR, the pipeline posts the failure to the PR and blocks merge.
 - If `pulumi up` fails after merge, Pulumi's state tracks partial progress; the next merge will reconcile.
-- Secrets not configured in CI environment cause provider initialization failures with clear error messages.
+- ESC environment misconfiguration (missing OIDC trust, wrong role ARN) causes authentication failures with clear error messages before any resources are touched.
 
 ## Testing Strategy
 
