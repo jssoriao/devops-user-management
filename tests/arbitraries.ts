@@ -72,6 +72,7 @@ export function validIAMAssignment(
 /**
  * Arbitrary for a valid four-section UsersConfig where all cross-references resolve.
  * Generates 1-3 accounts, 1-3 teams, 1-3 groups per account, and 1-5 users.
+ * Each user gets the first team and one assignment to the first account/group.
  */
 export const validUsersConfig: fc.Arbitrary<UsersConfig> = fc
   .record({
@@ -113,6 +114,64 @@ export const validUsersConfig: fc.Arbitrary<UsersConfig> = fc
 
     return { aws_accounts, github_teams, iam_groups, users };
   });
+
+/**
+ * Arbitrary for a valid UsersConfig with variable IAM assignments per user.
+ * Each user gets a random subset (1+) of account/group pairs from the available
+ * combinations, enabling property tests that verify total assignment counts.
+ */
+export const validUsersConfigWithMultiAssignments: fc.Arbitrary<UsersConfig> =
+  fc
+    .record({
+      accountNames: fc.uniqueArray(validName, { minLength: 1, maxLength: 3 }),
+      teamNames: fc.uniqueArray(validName, { minLength: 1, maxLength: 3 }),
+      groupNames: fc.uniqueArray(validName, { minLength: 1, maxLength: 2 }),
+      userNames: fc.uniqueArray(validName, { minLength: 1, maxLength: 4 }),
+      seed: fc.nat(),
+    })
+    .filter(
+      (r) =>
+        r.accountNames.length > 0 &&
+        r.teamNames.length > 0 &&
+        r.groupNames.length > 0 &&
+        r.userNames.length > 0,
+    )
+    .map(({ accountNames, teamNames, groupNames, userNames, seed }) => {
+      const aws_accounts: AWSAccountEntry[] = accountNames.map((name) => ({
+        name,
+      }));
+
+      const github_teams: GitHubTeamEntry[] = teamNames.map((name) => ({
+        name,
+      }));
+
+      const iam_groups: IAMGroupEntry[] = [];
+      for (const acctName of accountNames) {
+        for (const grpName of groupNames) {
+          iam_groups.push({ name: grpName, account: acctName });
+        }
+      }
+
+      // Build all valid account/group pairs
+      const allPairs = iam_groups.map((g) => ({
+        account: g.account,
+        iam_group: g.name,
+      }));
+
+      // Each user gets a deterministic non-empty subset of pairs
+      const users: UserEntry[] = userNames.map((name, idx) => {
+        const userSeed = seed + idx;
+        const count = (userSeed % allPairs.length) + 1;
+        const assignments = allPairs.slice(0, count);
+        return {
+          name,
+          github: { team: teamNames[idx % teamNames.length] },
+          iam_assignments: assignments,
+        };
+      });
+
+      return { aws_accounts, github_teams, iam_groups, users };
+    });
 
 /** Name containing at least one invalid character */
 export const invalidName = fc.oneof(

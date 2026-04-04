@@ -1,6 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as pulumi from "@pulumi/pulumi";
 
+import * as fc from "fast-check";
+
+import { validUsersConfigWithMultiAssignments } from "./arbitraries";
 import { UsersConfig, validateConfig } from "../src/config";
 import { NAME_PATTERN, resourceName } from "../src/naming";
 
@@ -682,5 +685,232 @@ describe("integration: IAM resources use correct account provider", () => {
     for (const a of prodAttachments) {
       expect(a.provider).toContain("prod");
     }
+  });
+});
+
+// =============================================================================
+// Property test: team membership links to correct team (Property 8)
+// =============================================================================
+
+describe("property: team membership links to correct team (P8)", () => {
+  it("for any valid config, each TeamMembership references the correct team slug", async () => {
+    await fc.assert(
+      fc.asyncProperty(validUsersConfigWithMultiAssignments, async (config) => {
+        createdResources.length = 0;
+
+        await deployConfig(config);
+
+        // Build expected mapping: username → team slug from config
+        const expectedTeamByUser = new Map<string, string>();
+        for (const user of config.users) {
+          expectedTeamByUser.set(user.name, user.github.team);
+        }
+
+        // Collect the set of valid team slugs from github_teams
+        const validTeamSlugs = new Set(config.github_teams.map((t) => t.name));
+
+        // Each TeamMembership should have a teamId matching the user's github.team slug
+        const teamMemberships = createdResources.filter(
+          (r) => r.type === "github:index/teamMembership:TeamMembership",
+        );
+
+        expect(teamMemberships).toHaveLength(config.users.length);
+
+        for (const tm of teamMemberships) {
+          const teamId = tm.inputs.teamId as string;
+          const username = tm.inputs.username as string;
+
+          // The teamId should be a valid team slug from github_teams
+          expect(
+            validTeamSlugs.has(teamId),
+            `TeamMembership for "${username}" references unknown team "${teamId}"`,
+          ).toBe(true);
+
+          // The teamId should match the expected team for this user
+          const expectedTeam = expectedTeamByUser.get(username);
+          expect(
+            teamId,
+            `TeamMembership for "${username}" should reference team "${expectedTeam}" but got "${teamId}"`,
+          ).toBe(expectedTeam);
+        }
+      }),
+      { numRuns: 20 },
+    );
+  });
+});
+
+// =============================================================================
+// Property test: IAM user assigned to correct group in correct account (Property 9)
+// =============================================================================
+
+describe("property: IAM user assigned to correct group in correct account (P9)", () => {
+  it("for any valid config, each UserGroupMembership references the correct IAM group for the correct account", async () => {
+    await fc.assert(
+      fc.asyncProperty(validUsersConfigWithMultiAssignments, async (config) => {
+        createdResources.length = 0;
+        const stackName = "dev";
+
+        await deployConfig(config, stackName);
+
+        // Build expected mapping: for each user + assignment, we expect a
+        // UserGroupMembership with groups containing resourceName(stackName, iam_group)
+        // and the resource's provider should reference the assignment's account.
+        const expectedAssignments: Array<{
+          username: string;
+          account: string;
+          groupName: string;
+        }> = [];
+        for (const user of config.users) {
+          for (const assignment of user.iam_assignments) {
+            expectedAssignments.push({
+              username: user.name,
+              account: assignment.account,
+              groupName: resourceName(stackName, assignment.iam_group),
+            });
+          }
+        }
+
+        const groupMemberships = createdResources.filter(
+          (r) => r.type === "aws:iam/userGroupMembership:UserGroupMembership",
+        );
+
+        // One UserGroupMembership per IAM assignment across all users
+        expect(groupMemberships).toHaveLength(expectedAssignments.length);
+
+        // For each expected assignment, find the matching UserGroupMembership
+        for (const expected of expectedAssignments) {
+          const matching = groupMemberships.filter((gm) => {
+            const groups = gm.inputs.groups as string[];
+            return (
+              groups.includes(expected.groupName) &&
+              gm.provider?.includes(expected.account)
+            );
+          });
+
+          expect(
+            matching.length,
+            `Expected a UserGroupMembership for user "${expected.username}" ` +
+              `with group "${expected.groupName}" in account "${expected.account}", ` +
+              `but found ${matching.length} matches`,
+          ).toBeGreaterThanOrEqual(1);
+        }
+
+        // Verify every UserGroupMembership has a groups array referencing a
+        // valid IAM group name from the config
+        const validGroupNames = new Set(
+          config.iam_groups.map((g) => resourceName(stackName, g.name)),
+        );
+        for (const gm of groupMemberships) {
+          const groups = gm.inputs.groups as string[];
+          for (const groupRef of groups) {
+            expect(
+              validGroupNames.has(groupRef),
+              `UserGroupMembership "${gm.name}" references unknown group "${groupRef}"`,
+            ).toBe(true);
+          }
+        }
+      }),
+      { numRuns: 20 },
+    );
+  });
+});
+
+// =============================================================================
+// Property test: resource count matches configuration (Property 2)
+// =============================================================================
+
+describe("property: resource count matches configuration (P2)", () => {
+  it("for any valid config, resource counts match expected totals", async () => {
+    await fc.assert(
+      fc.asyncProperty(validUsersConfigWithMultiAssignments, async (config) => {
+        // Clear tracked resources before each run
+        createdResources.length = 0;
+
+        await deployConfig(config);
+
+        const A = config.aws_accounts.length;
+        const M = config.github_teams.length;
+        const K = config.iam_groups.length;
+        const N = config.users.length;
+        const T = config.users.reduce(
+          (sum, u) => sum + u.iam_assignments.length,
+          0,
+        );
+
+        // A AWS providers
+        const providers = createdResources.filter(
+          (r) => r.type === "pulumi:providers:aws",
+        );
+        expect(providers).toHaveLength(A);
+
+        // M GitHub teams (one github.Team per GitHubTeamComponent)
+        const githubTeams = createdResources.filter(
+          (r) => r.type === "github:index/team:Team",
+        );
+        expect(githubTeams).toHaveLength(M);
+
+        // M GitHubTeamComponent component resources
+        const teamComponents = createdResources.filter(
+          (r) => r.type === "devops-user-management:GitHubTeamComponent",
+        );
+        expect(teamComponents).toHaveLength(M);
+
+        // N UserComponent component resources
+        const userComponents = createdResources.filter(
+          (r) => r.type === "devops-user-management:UserComponent",
+        );
+        expect(userComponents).toHaveLength(N);
+
+        // N GitHub memberships (one per user)
+        const memberships = createdResources.filter(
+          (r) => r.type === "github:index/membership:Membership",
+        );
+        expect(memberships).toHaveLength(N);
+
+        // N team memberships (one per user)
+        const teamMemberships = createdResources.filter(
+          (r) => r.type === "github:index/teamMembership:TeamMembership",
+        );
+        expect(teamMemberships).toHaveLength(N);
+
+        // N GitHubMembershipComponent component resources
+        const membershipComponents = createdResources.filter(
+          (r) => r.type === "devops-user-management:GitHubMembershipComponent",
+        );
+        expect(membershipComponents).toHaveLength(N);
+
+        // T IAM users (one per iam_assignment across all users)
+        const iamUsers = createdResources.filter(
+          (r) => r.type === "aws:iam/user:User",
+        );
+        expect(iamUsers).toHaveLength(T);
+
+        // T AWSUserComponent component resources
+        const awsUserComponents = createdResources.filter(
+          (r) => r.type === "devops-user-management:AWSUserComponent",
+        );
+        expect(awsUserComponents).toHaveLength(T);
+
+        // T UserGroupMemberships (one per IAM user)
+        const groupMemberships = createdResources.filter(
+          (r) => r.type === "aws:iam/userGroupMembership:UserGroupMembership",
+        );
+        expect(groupMemberships).toHaveLength(T);
+
+        // K IAM groups
+        const iamGroups = createdResources.filter(
+          (r) => r.type === "aws:iam/group:Group",
+        );
+        expect(iamGroups).toHaveLength(K);
+
+        // K GroupPolicyAttachments (one per group, all default to ReadOnlyAccess)
+        const policyAttachments = createdResources.filter(
+          (r) =>
+            r.type === "aws:iam/groupPolicyAttachment:GroupPolicyAttachment",
+        );
+        expect(policyAttachments).toHaveLength(K);
+      }),
+      { numRuns: 20 },
+    );
   });
 });

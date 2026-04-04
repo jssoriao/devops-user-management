@@ -146,7 +146,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
 - [x] 10. Checkpoint - Validate all components and orchestration
   - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 11. Implement integration tests with Pulumi mocks
+- [x] 11. Implement integration tests with Pulumi mocks
   - [x] 11.1 Create `tests/index.test.ts` with Pulumi mock setup and unit tests
     - Set up `pulumi.runtime.setMocks()` to mock resource creation and track created resources
     - Test: two accounts, two users with multi-account iam_assignments → correct resource counts (2 providers, 2 teams, 2 user components each containing 1 membership + correct number of IAM users per assignment, correct number of IAM groups per account)
@@ -165,17 +165,17 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Test: IAM resources use correct account provider
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-  - [ ]* 11.2 Write property test for resource count matches configuration (Property 2)
+  - [x] 11.2 Write property test for resource count matches configuration (Property 2)
     - **Property 2: Resource count matches configuration**
     - Use Pulumi mocks and fast-check to generate random valid four-section configs and verify exactly A providers, M teams, N user components (each with 1 membership), T IAM users (one per iam_assignment), K IAM groups are registered
     - **Validates: Requirements 1.10, 2.1, 3.1, 4.5, 5.1, 10.1**
 
-  - [ ]* 11.3 Write property test for team membership links to correct team (Property 8)
+  - [x] 11.3 Write property test for team membership links to correct team (Property 8)
     - **Property 8: Team membership links to correct team**
     - Use Pulumi mocks and fast-check to verify each `TeamMembership` references the correct team from `github_teams`
     - **Validates: Requirements 3.2**
 
-  - [ ]* 11.4 Write property test for IAM user assigned to correct group in correct account (Property 9)
+  - [x] 11.4 Write property test for IAM user assigned to correct group in correct account (Property 9)
     - **Property 9: IAM user assigned to correct group in correct account**
     - Use Pulumi mocks and fast-check to verify each `UserGroupMembership` references the correct IAM group from `iam_groups` for the correct account
     - **Validates: Requirements 4.3**
