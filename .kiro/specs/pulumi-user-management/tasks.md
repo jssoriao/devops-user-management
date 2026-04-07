@@ -180,7 +180,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Use Pulumi mocks and fast-check to verify each `UserGroupMembership` references the correct IAM group from `iam_groups` for the correct account
     - **Validates: Requirements 4.3**
 
-  - [ ]* 11.5 Write property test for IAM group policy resolution (Property 10)
+  - [x] 11.5 Write property test for IAM group policy resolution (Property 10)
     - **Property 10: IAM group policy resolution**
     - Use Pulumi mocks and fast-check to generate random `IAMGroupEntry` objects with/without `policy_arn`/`policy_arns` and verify correct policy ARNs are attached (or default `ReadOnlyAccess`)
     - **Validates: Requirements 5.2, 5.3, 5.4**
@@ -190,17 +190,17 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Use Pulumi mocks and fast-check to generate random valid configs with multiple accounts and verify each IAM resource (group, user, policy attachment) is created using the `aws.Provider` for its account
     - **Validates: Requirements 4.1, 10.2, 10.3, 10.4**
 
-- [ ] 12. Checkpoint - Ensure all tests pass
+- [x] 12. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Create Pulumi stack configuration and ESC environments
-  - [ ] 13.1 Update `Pulumi.live.yaml` to reference ESC environment
+- [x] 13. Create Pulumi stack configuration and ESC environments
+  - [x] 13.1 Update `Pulumi.live.yaml` to reference ESC environment
     - Add `environment: [user-mgmt/live]` to reference the composed ESC environment
     - Include `usersFile` config pointing to `users.yaml`
     - No secrets stored in stack YAML — all credentials managed by ESC
     - _Requirements: 8.1, 8.2, 8.3, 9.1, 9.2, 9.3, 9.5_
 
-  - [ ] 13.2 Document Pulumi ESC environment setup
+  - [x] 13.2 Document Pulumi ESC environment setup
     - Document per-account ESC environments with `fn::open::aws-login` OIDC configuration
     - Document composed `user-mgmt/live` ESC environment that imports account environments and GitHub token
     - Document AWS IAM OIDC identity provider setup for Pulumi Cloud

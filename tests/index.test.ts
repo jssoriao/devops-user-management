@@ -3,8 +3,8 @@ import * as pulumi from "@pulumi/pulumi";
 
 import * as fc from "fast-check";
 
-import { validUsersConfigWithMultiAssignments } from "./arbitraries";
-import { UsersConfig, validateConfig } from "../src/config";
+import { validName, validUsersConfigWithMultiAssignments } from "./arbitraries";
+import { IAMGroupEntry, UsersConfig, validateConfig } from "../src/config";
 import { NAME_PATTERN, resourceName } from "../src/naming";
 
 // Track created resources for assertions
@@ -911,6 +911,161 @@ describe("property: resource count matches configuration (P2)", () => {
         expect(policyAttachments).toHaveLength(K);
       }),
       { numRuns: 20 },
+    );
+  });
+});
+
+// =============================================================================
+// Property test: IAM group policy resolution (Property 10)
+// =============================================================================
+
+describe("property: IAM group policy resolution (P10)", () => {
+  const DEFAULT_POLICY_ARN = "arn:aws:iam::aws:policy/ReadOnlyAccess";
+
+  /**
+   * Arbitrary that generates a valid UsersConfig where each IAM group has one of:
+   * - policy_arns (list of 1-3 ARNs)
+   * - policy_arn (single ARN)
+   * - neither (should default to ReadOnlyAccess)
+   */
+  const configWithVariedPolicies = fc
+    .record({
+      accountName: validName,
+      teamName: validName,
+      groupNames: fc.uniqueArray(validName, { minLength: 1, maxLength: 4 }),
+      userName: validName,
+      policySeed: fc.nat(),
+    })
+    .filter(
+      (r) =>
+        r.groupNames.length > 0 &&
+        !r.groupNames.includes(r.accountName) &&
+        !r.groupNames.includes(r.teamName) &&
+        r.accountName !== r.teamName &&
+        r.userName !== r.accountName &&
+        r.userName !== r.teamName &&
+        !r.groupNames.includes(r.userName),
+    )
+    .chain(({ accountName, teamName, groupNames, userName, policySeed }) => {
+      // Generate a policy variant for each group
+      const policyVariantArb = fc.array(
+        fc.constantFrom("none", "single", "multiple"),
+        { minLength: groupNames.length, maxLength: groupNames.length },
+      );
+
+      return policyVariantArb.map((variants) => {
+        const iam_groups: IAMGroupEntry[] = groupNames.map((name, i) => {
+          const variant = variants[i];
+          const base: IAMGroupEntry = { name, account: accountName };
+          if (variant === "single") {
+            base.policy_arn = `arn:aws:iam::aws:policy/Policy-${name}`;
+          } else if (variant === "multiple") {
+            const count = (policySeed % 3) + 1; // 1-3 policies
+            base.policy_arns = Array.from(
+              { length: count },
+              (_, j) => `arn:aws:iam::aws:policy/Policy-${name}-${j}`,
+            );
+          }
+          // variant === "none" → no policy fields, should default to ReadOnlyAccess
+          return base;
+        });
+
+        const config: UsersConfig = {
+          aws_accounts: [{ name: accountName }],
+          github_teams: [{ name: teamName }],
+          iam_groups,
+          users: [
+            {
+              name: userName,
+              github: { team: teamName },
+              iam_assignments: [
+                { account: accountName, iam_group: groupNames[0] },
+              ],
+            },
+          ],
+        };
+
+        return { config, iam_groups };
+      });
+    });
+
+  it("for any valid config, policy_arns → multiple attachments, policy_arn → single attachment, neither → ReadOnlyAccess", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        configWithVariedPolicies,
+        async ({ config, iam_groups }) => {
+          createdResources.length = 0;
+
+          await deployConfig(config);
+
+          const attachments = createdResources.filter(
+            (r) =>
+              r.type === "aws:iam/groupPolicyAttachment:GroupPolicyAttachment",
+          );
+
+          // Calculate expected total attachments
+          let expectedTotal = 0;
+          for (const group of iam_groups) {
+            if (group.policy_arns) {
+              expectedTotal += group.policy_arns.length;
+            } else {
+              expectedTotal += 1; // single policy_arn or default
+            }
+          }
+          expect(attachments).toHaveLength(expectedTotal);
+
+          // Verify each group's policy attachments individually
+          const stackName = "dev";
+          for (const group of iam_groups) {
+            const prefix = resourceName(
+              stackName,
+              group.account,
+              group.name,
+              "policy",
+            );
+            const groupAttachments = attachments.filter((a) =>
+              a.name.startsWith(prefix),
+            );
+
+            if (group.policy_arns) {
+              // Multiple policies: one attachment per ARN
+              expect(
+                groupAttachments,
+                `Group "${group.name}" with policy_arns should have ${group.policy_arns.length} attachments`,
+              ).toHaveLength(group.policy_arns.length);
+
+              const attachedArns = groupAttachments.map(
+                (a) => a.inputs.policyArn,
+              );
+              for (const expectedArn of group.policy_arns) {
+                expect(
+                  attachedArns,
+                  `Group "${group.name}" should have attachment for "${expectedArn}"`,
+                ).toContain(expectedArn);
+              }
+            } else if (group.policy_arn) {
+              // Single policy: exactly one attachment
+              expect(
+                groupAttachments,
+                `Group "${group.name}" with policy_arn should have 1 attachment`,
+              ).toHaveLength(1);
+              expect(groupAttachments[0].inputs.policyArn).toBe(
+                group.policy_arn,
+              );
+            } else {
+              // No policy: defaults to ReadOnlyAccess
+              expect(
+                groupAttachments,
+                `Group "${group.name}" with no policy should have 1 default attachment`,
+              ).toHaveLength(1);
+              expect(groupAttachments[0].inputs.policyArn).toBe(
+                DEFAULT_POLICY_ARN,
+              );
+            }
+          }
+        },
+      ),
+      { numRuns: 30 },
     );
   });
 });

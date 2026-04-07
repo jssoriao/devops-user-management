@@ -1,6 +1,5 @@
 environment:
   - user-mgmt/live
 config:
+  devops-user-management:usersFile: users.yaml
   github:owner: obscurus-dev
-  github:token:
-    secure: AAABAH2qOPztP4pJ6DESoDY6qPJhqcZ7qAK/gwFWp2FRwEXxPvASnMCQn0O/tXY1iwMrhf53igCsiEOB0ZXMEyUN9kDv+IuX
