@@ -13,16 +13,20 @@ github_teams:
 iam_groups:
   - name: backend-developers
     account: dev
-    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+    policy_arn: "arn:aws:iam::982081070021:policy/dev-backend-developers"
+    path: "/engineering/"
   - name: backend-developers
     account: prod
-    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+    policy_arn: "arn:aws:iam::451620995551:policy/prod-backend-developers"
+    path: "/engineering/"
   - name: frontend-developers
     account: dev
-    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+    policy_arn: "arn:aws:iam::982081070021:policy/dev-frontend-developers"
+    path: "/engineering/"
   - name: frontend-developers
     account: prod
-    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
+    policy_arn: "arn:aws:iam::451620995551:policy/prod-frontend-developers"
+    path: "/engineering/"
 
 users:
   - name: exztinct01
