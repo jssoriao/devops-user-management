@@ -207,8 +207,8 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Document IAM role trust policies for each target account
     - _Requirements: 9.1, 9.2, 9.3, 9.5_
 
-- [ ] 14. Create deploy pipeline configuration
-  - [ ] 14.1 Create `.github/workflows/deploy.yml` GitHub Actions workflow
+- [x] 14. Create deploy pipeline configuration
+  - [x] 14.1 Create `.github/workflows/deploy.yml` GitHub Actions workflow
     - On `pull_request` targeting `main`: run `pulumi preview --stack live`, post results to PR
     - On `push` to `main` (only via merged PR): run `pulumi up --stack live --yes`
     - Retrieve `PULUMI_ACCESS_TOKEN` from GitHub Actions secrets (ESC handles AWS and GitHub credentials via OIDC)
