@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "PROD managed IAM policy for backend-developers group — S3 read-only, no DynamoDB"
+
+Resources:
+  BackendDevelopersPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "prod-backend-developers"
+      Description: "PROD least-privilege policy for backend developers — S3 read-only, no DynamoDB data access"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowS3ListBuckets
+            Effect: "Allow"
+            Action:
+              - "s3:ListAllMyBuckets"
+            Resource: "*"
+
+          - Sid: AllowS3ReadOnly
+            Effect: "Allow"
+            Action:
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+              - "s3:ListBucketVersions"
+              - "s3:GetBucketVersioning"
+              - "s3:GetObject"
+              - "s3:GetObjectVersion"
+            Resource:
+              - "arn:aws:s3:::prod-backend-developers-*"
+              - "arn:aws:s3:::prod-backend-developers-*/*"
+
+          - Sid: DenyS3ProtectedBucketPatterns
+            Effect: "Deny"
+            Action:
+              - "s3:*"
+            Resource:
+              - "arn:aws:s3:::*-*alblogs*"
+              - "arn:aws:s3:::*-*cdn-logs*"
+              - "arn:aws:s3:::*-*cloudtraillogs*"
+              - "arn:aws:s3:::*-*-logs-*"
+              - "arn:aws:s3:::*-*-logs"
+              - "arn:aws:s3:::*-*-log-*"
+              - "arn:aws:s3:::*-*-log"
+              - "arn:aws:s3:::*-*terragrunt*"
+              - "arn:aws:s3:::*-*terraform*"
+              - "arn:aws:s3:::*-cdk-*"
+              - "arn:aws:s3:::*-cf-templates-*"
+              - "arn:aws:s3:::*-*devops*"
+              - "arn:aws:s3:::*-*accesslog*"
+              - "arn:aws:s3:::*-*sessionlog*"
+              - "arn:aws:s3:::*-*cloudfrontlog*"
+              - "arn:aws:s3:::*-*flowlog*"
+              - "arn:aws:s3:::*-*alblogs*/*"
+              - "arn:aws:s3:::*-*cdn-logs*/*"
+              - "arn:aws:s3:::*-*cloudtraillogs*/*"
+              - "arn:aws:s3:::*-*-logs-*/*"
+              - "arn:aws:s3:::*-*-logs/*"
+              - "arn:aws:s3:::*-*-log-*/*"
+              - "arn:aws:s3:::*-*-log/*"
+              - "arn:aws:s3:::*-*terragrunt*/*"
+              - "arn:aws:s3:::*-*terraform*/*"
+              - "arn:aws:s3:::*-cdk-*/*"
+              - "arn:aws:s3:::*-cf-templates-*/*"
+              - "arn:aws:s3:::*-*devops*/*"
+              - "arn:aws:s3:::*-*accesslog*/*"
+              - "arn:aws:s3:::*-*sessionlog*/*"
+              - "arn:aws:s3:::*-*cloudfrontlog*/*"
+              - "arn:aws:s3:::*-*flowlog*/*"
+
+          - Sid: DenyDynamoDBDataAccess
+            Effect: "Deny"
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:Query"
+              - "dynamodb:Scan"
+              - "dynamodb:BatchGetItem"
+              - "dynamodb:BatchWriteItem"
+            Resource: "*"
+
+          - Sid: AllowDynamoDBDescribeOnly
+            Effect: "Allow"
+            Action:
+              - "dynamodb:DescribeTable"
+              - "dynamodb:ListTables"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/prod-backend-developers-*"
+
+          - Sid: AllowKmsForS3
+            Effect: "Allow"
+            Action:
+              - "kms:Decrypt"
+              - "kms:DescribeKey"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub "s3.${AWS::Region}.amazonaws.com"
+
+Outputs:
+  PolicyArn:
+    Description: "ARN of the prod backend-developers managed policy"
+    Value: !Ref BackendDevelopersPolicy
+    Export:
+      Name: "prod-backend-developers-policy-arn"

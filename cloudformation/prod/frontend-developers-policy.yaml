@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "PROD managed IAM policy for frontend-developers group — S3 read-only, CloudFront read-only"
+
+Resources:
+  FrontendDevelopersPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "prod-frontend-developers"
+      Description: "PROD least-privilege policy for frontend developers — S3 read-only, CloudFront read-only, no invalidation"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowS3ListBuckets
+            Effect: "Allow"
+            Action:
+              - "s3:ListAllMyBuckets"
+            Resource: "*"
+
+          - Sid: AllowS3ReadOnly
+            Effect: "Allow"
+            Action:
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+              - "s3:ListBucketVersions"
+              - "s3:GetBucketVersioning"
+              - "s3:GetObject"
+              - "s3:GetObjectVersion"
+            Resource:
+              - "arn:aws:s3:::prod-frontend-developers-*"
+              - "arn:aws:s3:::prod-frontend-developers-*/*"
+
+          - Sid: DenyS3ProtectedBucketPatterns
+            Effect: "Deny"
+            Action:
+              - "s3:*"
+            Resource:
+              - "arn:aws:s3:::*-*alblogs*"
+              - "arn:aws:s3:::*-*cdn-logs*"
+              - "arn:aws:s3:::*-*cloudtraillogs*"
+              - "arn:aws:s3:::*-*-logs-*"
+              - "arn:aws:s3:::*-*-logs"
+              - "arn:aws:s3:::*-*-log-*"
+              - "arn:aws:s3:::*-*-log"
+              - "arn:aws:s3:::*-*terragrunt*"
+              - "arn:aws:s3:::*-*terraform*"
+              - "arn:aws:s3:::*-cdk-*"
+              - "arn:aws:s3:::*-cf-templates-*"
+              - "arn:aws:s3:::*-*devops*"
+              - "arn:aws:s3:::*-*accesslog*"
+              - "arn:aws:s3:::*-*sessionlog*"
+              - "arn:aws:s3:::*-*cloudfrontlog*"
+              - "arn:aws:s3:::*-*flowlog*"
+              - "arn:aws:s3:::*-*alblogs*/*"
+              - "arn:aws:s3:::*-*cdn-logs*/*"
+              - "arn:aws:s3:::*-*cloudtraillogs*/*"
+              - "arn:aws:s3:::*-*-logs-*/*"
+              - "arn:aws:s3:::*-*-logs/*"
+              - "arn:aws:s3:::*-*-log-*/*"
+              - "arn:aws:s3:::*-*-log/*"
+              - "arn:aws:s3:::*-*terragrunt*/*"
+              - "arn:aws:s3:::*-*terraform*/*"
+              - "arn:aws:s3:::*-cdk-*/*"
+              - "arn:aws:s3:::*-cf-templates-*/*"
+              - "arn:aws:s3:::*-*devops*/*"
+              - "arn:aws:s3:::*-*accesslog*/*"
+              - "arn:aws:s3:::*-*sessionlog*/*"
+              - "arn:aws:s3:::*-*cloudfrontlog*/*"
+              - "arn:aws:s3:::*-*flowlog*/*"
+
+          - Sid: AllowCloudFrontReadOnly
+            Effect: "Allow"
+            Action:
+              - "cloudfront:Get*"
+              - "cloudfront:List*"
+              - "cloudfront:DescribeFunction"
+            Resource: "*"
+
+          - Sid: AllowKmsForS3
+            Effect: "Allow"
+            Action:
+              - "kms:Decrypt"
+              - "kms:DescribeKey"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub "s3.${AWS::Region}.amazonaws.com"
+
+Outputs:
+  PolicyArn:
+    Description: "ARN of the prod frontend-developers managed policy"
+    Value: !Ref FrontendDevelopersPolicy
+    Export:
+      Name: "prod-frontend-developers-policy-arn"

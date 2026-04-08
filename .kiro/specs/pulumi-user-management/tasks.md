@@ -225,7 +225,7 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Document how to configure secrets using Pulumi ESC: per-account OIDC environments, composed stack environments, GitHub token management, and AWS IAM trust policy setup
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
 
-- [ ] 16. Final checkpoint - Ensure all tests pass
+- [x] 16. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
