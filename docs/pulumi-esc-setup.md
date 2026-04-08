@@ -159,12 +159,12 @@ The naming convention for env vars is `{ACCOUNT_NAME}_AWS_ACCESS_KEY_ID` etc., w
 
 ### ESC Environment Summary
 
-| ESC Environment              | Purpose                                     |
-| ---------------------------- | ------------------------------------------- |
-| `user-mgmt/aws-dev`         | OIDC login for dev AWS account              |
-| `user-mgmt/aws-prod`        | OIDC login for prod AWS account             |
-| `user-mgmt/github`          | GitHub token (stored as ESC secret)         |
-| `user-mgmt/live`            | Composed env for live stack (imports above) |
+| ESC Environment      | Purpose                                     |
+| -------------------- | ------------------------------------------- |
+| `user-mgmt/aws-dev`  | OIDC login for dev AWS account              |
+| `user-mgmt/aws-prod` | OIDC login for prod AWS account             |
+| `user-mgmt/github`   | GitHub token (stored as ESC secret)         |
+| `user-mgmt/live`     | Composed env for live stack (imports above) |
 
 ## Step 5: Validate
 

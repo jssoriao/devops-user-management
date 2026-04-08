@@ -215,8 +215,8 @@ Incrementally build a Pulumi TypeScript project that manages GitHub teams/member
     - Report "no changes" when preview detects no diff
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
-- [ ] 15. Create README documentation
-  - [ ] 15.1 Write `README.md` with complete project documentation
+- [x] 15. Create README documentation
+  - [x] 15.1 Write `README.md` with complete project documentation
     - Document how to install dependencies (`pnpm install`) and run the Pulumi project (`pulumi up`)
     - Document how to add/remove users by editing `users.yaml`
     - Document the four-section YAML configuration structure (`aws_accounts`, `github_teams`, `iam_groups`, `users`) with all supported properties for each section
